@@ -4,7 +4,8 @@
   "description": "Legion.io browser game",
   "scripts": {
     "start": "node server.js",
-    "vercel-build": "echo Static deployment ready"
+    "build": "node build-vercel.js",
+    "vercel-build": "node build-vercel.js"
   },
   "dependencies": {
     "express": "^4.19.2",

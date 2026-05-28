@@ -1,18 +1,7 @@
 {
   "version": 2,
-  "cleanUrls": true,
-  "functions": {
-    "api/index.js": {
-      "includeFiles": [
-        "index.html",
-        "game.js",
-        "style.css",
-        "server.js",
-        "img/**",
-        "package.json"
-      ]
-    }
-  },
+  "buildCommand": "node build-vercel.js",
+  "outputDirectory": "dist",
   "headers": [
     {
       "source": "/(.*)",
@@ -27,7 +16,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "destination": "/api/index.js"
+      "destination": "/index.html"
     }
   ]
 }
