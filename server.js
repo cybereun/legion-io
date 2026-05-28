@@ -6,6 +6,8 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+const STATIC_ROOT = __dirname;
+const IS_VERCEL = Boolean(process.env.VERCEL);
 
 const PORT = process.env.PORT || 8000;
 const WORLD_SIZE = 6000;
@@ -31,8 +33,19 @@ app.use((req, res, next) => {
 });
 
 // 정적 파일 호스팅 (현재 폴더 전체 서빙)
-app.use(express.static(__dirname));
+app.use(express.static(STATIC_ROOT, { index: false }));
 
+// Vercel/Express 양쪽에서 루트와 SPA fallback을 확실히 index.html로 연결합니다.
+// 이전 배포에서는 Vercel이 Express 엔트리만 실행하면서 `/`가 `Cannot GET /`로 떨어졌습니다.
+app.get(['/', '/index.html'], (req, res) => {
+  res.sendFile(path.join(STATIC_ROOT, 'index.html'));
+});
+
+app.get(/^\/(?!socket\.io\/).*/, (req, res, next) => {
+  // 확장자가 있는 정적 파일은 express.static의 404로 남겨서 문제 파일을 숨기지 않습니다.
+  if (path.extname(req.path)) return next();
+  res.sendFile(path.join(STATIC_ROOT, 'index.html'));
+});
 
 // 방(Room) 목록 및 인게임 정보 관리 맵
 // 구조: { [roomCode]: { host: socketId, players: { [socketId]: playerData }, buildings: [], coins: [], items: [], started: false } }
@@ -446,9 +459,13 @@ io.on('connection', (socket) => {
 });
 
 // 서버 실행
-server.listen(PORT, () => {
-  console.log(`-----------------------------------------------------`);
-  console.log(` Legion.io Realtime Server is now running!`);
-  console.log(` Local URL: http://localhost:${PORT}`);
-  console.log(`-----------------------------------------------------`);
-});
+if (!IS_VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`-----------------------------------------------------`);
+    console.log(` Legion.io Realtime Server is now running!`);
+    console.log(` Local URL: http://localhost:${PORT}`);
+    console.log(`-----------------------------------------------------`);
+  });
+}
+
+module.exports = app;

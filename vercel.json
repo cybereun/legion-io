@@ -1,6 +1,17 @@
 {
   "version": 2,
   "cleanUrls": true,
+  "functions": {
+    "server.js": {
+      "includeFiles": [
+        "index.html",
+        "game.js",
+        "style.css",
+        "img/**",
+        "package.json"
+      ]
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
@@ -12,14 +23,10 @@
       ]
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/(.*\\.(?:js|css|png|jpg|jpeg|gif|svg|ico|webp|woff|woff2|ttf|otf|json|map))",
-      "dest": "/$1"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/server.js"
     }
   ]
 }
