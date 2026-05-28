@@ -4,36 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>리전 아이오 (Legion.io) | 대규모 군집 전투 게임</title>
-
-  <!-- 브라우저 확장 프로그램이 삽입하는 CSP meta 태그 제거 스크립트 -->
-  <script>
-    (function removeForcedCSP() {
-      // 확장 프로그램이 나중에 meta 주입 시에도 대응하기 위해 MutationObserver 사용
-      const observer = new MutationObserver(function(mutations) {
-        mutations.forEach(function(m) {
-          m.addedNodes.forEach(function(node) {
-            if (
-              node.nodeName === 'META' &&
-              node.httpEquiv &&
-              node.httpEquiv.toLowerCase() === 'content-security-policy'
-            ) {
-              node.remove();
-            }
-          });
-        });
-      });
-      // <head> 및 <html> 전체를 감시
-      observer.observe(document.documentElement, { childList: true, subtree: true });
-      // 이미 존재하는 CSP meta 태그도 즉시 제거
-      document.querySelectorAll('meta[http-equiv="Content-Security-Policy"]').forEach(function(el) {
-        el.remove();
-      });
-    })();
-  </script>
-
   <link rel="stylesheet" href="style.css">
 </head>
-
 <body>
 
   <!-- 게임 오버레이 HUD -->
@@ -120,22 +92,22 @@
       <div class="shop-divider"></div>
 
       <!-- RTS 생산형 건물 -->
-      <div class="shop-item" onclick="startBuilding('barracks')" title="단축키 Q">
+      <div class="shop-item production-item" onclick="startBuilding('barracks')" title="단축키 Q">
         <div class="unit-preview barracks-icon">🛖</div>
         <div class="unit-info">
           <span class="unit-name">병영</span>
           <span class="unit-cost">💰 400G</span>
         </div>
       </div>
-      <div class="shop-item" onclick="startBuilding('stable')" title="단축키 W">
+      <div class="shop-item production-item" onclick="startBuilding('stable')" title="단축키 W">
         <div class="unit-preview stable-icon">🐴</div>
         <div class="unit-info">
           <span class="unit-name">마구간</span>
           <span class="unit-cost">💰 800G</span>
         </div>
       </div>
-      <div class="shop-item" onclick="startBuilding('siegeWorkshop')" title="단축키 E">
-        <div class="unit-preview siege-icon">⚙️</div>
+      <div class="shop-item production-item siege-item" onclick="startBuilding('siegeWorkshop')" title="단축키 E">
+        <div class="unit-preview siege-icon">🏗️</div>
         <div class="unit-info">
           <span class="unit-name">공성소</span>
           <span class="unit-cost">💰 1200G</span>

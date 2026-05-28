@@ -343,7 +343,7 @@ const BUILDING_SPECS = {
   mageTower: { name: "메이지타워", cost: 1500, radius: 28, maxHealth: 800, icon: "🔮" },
   barracks: { name: "병영", cost: 400, radius: 27, maxHealth: 450, icon: "🛖" },
   stable: { name: "마구간", cost: 800, radius: 29, maxHealth: 650, icon: "🐴" },
-  siegeWorkshop: { name: "공성소", cost: 1200, radius: 32, maxHealth: 900, icon: "⚙️" }
+  siegeWorkshop: { name: "공성소", cost: 1200, radius: 32, maxHealth: 900, icon: "🏗️" }
 };
 
 // 마우스 입력 위치
