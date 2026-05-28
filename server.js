@@ -12,8 +12,27 @@ const WORLD_SIZE = 6000;
 const MAX_COINS = 350;
 const MAX_ITEMS = 35;
 
+// CSP(Content Security Policy) 헤더 설정 — 폰트/스크립트/스타일 외부 허용
+app.use((req, res, next) => {
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com data:",
+      "img-src 'self' data: blob:",
+      "connect-src 'self' ws: wss:",
+      "media-src 'self'",
+      "worker-src 'self' blob:"
+    ].join('; ')
+  );
+  next();
+});
+
 // 정적 파일 호스팅 (현재 폴더 전체 서빙)
 app.use(express.static(__dirname));
+
 
 // 방(Room) 목록 및 인게임 정보 관리 맵
 // 구조: { [roomCode]: { host: socketId, players: { [socketId]: playerData }, buildings: [], coins: [], items: [], started: false } }
