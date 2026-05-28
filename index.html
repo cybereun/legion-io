@@ -138,6 +138,7 @@
         
         <div class="lobby-action-group">
           <button id="startSingleBtn" class="primary-btn">오프라인 싱글플레이 시작</button>
+          <button id="openGuideBtn" class="info-btn">🎮 조작 방법 & 게임 가이드</button>
           
           <div class="lobby-divider"><span>OR MULTIPLAYER</span></div>
           
@@ -206,8 +207,152 @@
     </div>
   </div>
 
+  <!-- ============================
+       조작 방법 가이드 팝업 모달
+       ============================ -->
+  <div id="guideModal" class="guide-modal-overlay hidden">
+    <div class="guide-modal-box">
+      <!-- 닫기 버튼 -->
+      <button id="closeGuideBtn" class="guide-close-btn" aria-label="닫기">✕</button>
+
+      <div class="guide-header">
+        <div class="guide-logo">🪐 LEGION.IO</div>
+        <p class="guide-subtitle">조작 방법 & 게임 가이드</p>
+      </div>
+
+      <!-- 탭 네비게이션 -->
+      <div class="guide-tabs">
+        <button class="guide-tab active" data-tab="pc">🖥️ PC / 키보드</button>
+        <button class="guide-tab" data-tab="mobile">📱 모바일 / 터치</button>
+        <button class="guide-tab" data-tab="strategy">⚔️ 전략 팁</button>
+      </div>
+
+      <!-- PC 탭 -->
+      <div id="tab-pc" class="guide-tab-content active">
+        <div class="guide-section">
+          <h3 class="guide-section-title">🏃 기본 이동</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item">
+              <span class="key-badge">🖱️ 마우스</span>
+              <span class="key-desc">군주 이동 (마우스 커서 방향으로 자동 이동)</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">⚔️ 유닛 소환</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">1</span><span class="key-desc">🛡️ 보병 소환 — 💰 20G (근접 전투, 튼튼한 체력)</span></div>
+            <div class="guide-key-item"><span class="key-badge">2</span><span class="key-desc">🏹 궁수 소환 — 💰 35G (원거리, 빠른 연사)</span></div>
+            <div class="guide-key-item"><span class="key-badge">7</span><span class="key-desc">🐎 경기병 소환 — 💰 30G (고속 돌격 기마병)</span></div>
+            <div class="guide-key-item"><span class="key-badge">8</span><span class="key-desc">🪨 투석기 소환 — 💰 70G (초장거리 범위 공격)</span></div>
+            <div class="guide-key-item"><span class="key-badge">9</span><span class="key-desc">🗡️ 기사 소환 — 💰 38G (중갑 탱커, 철갑 방어)</span></div>
+            <div class="guide-key-item"><span class="key-badge">0</span><span class="key-desc">🔮 마법사 소환 — 💰 35G (마법 원거리 공격)</span></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">🏗️ 기지 건설</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">3</span><span class="key-desc">⛏️ 금광 — 💰 250G (1초마다 3G 자동 채굴)</span></div>
+            <div class="guide-key-item"><span class="key-badge">4</span><span class="key-desc">🏠 집 — 💰 250G (최대 인구수 +15 증가)</span></div>
+            <div class="guide-key-item"><span class="key-badge">5</span><span class="key-desc">🏰 아처타워 — 💰 500G (자동 원거리 방어)</span></div>
+            <div class="guide-key-item"><span class="key-badge">6</span><span class="key-desc">🔮 메이지타워 — 💰 1500G (마법 범위 방어)</span></div>
+            <div class="guide-key-item"><span class="key-badge">Q</span><span class="key-desc">🛖 병영 — 💰 400G (보병/궁수 자동 생산)</span></div>
+            <div class="guide-key-item"><span class="key-badge">W</span><span class="key-desc">🐴 마구간 — 💰 800G (경기병/기사 자동 생산)</span></div>
+            <div class="guide-key-item"><span class="key-badge">E</span><span class="key-desc">⚙️ 공성소 — 💰 1200G (투석기 자동 생산)</span></div>
+          </div>
+          <p class="guide-hint">💡 단축키 입력 후 마우스 클릭으로 원하는 위치에 건물 배치!</p>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">🎯 기타 조작</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">ESC</span><span class="key-desc">건설 / 소환 모드 취소</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 모바일 탭 -->
+      <div id="tab-mobile" class="guide-tab-content">
+        <div class="guide-section">
+          <h3 class="guide-section-title">📱 기본 조작</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">☝️ 터치 이동</span><span class="key-desc">화면의 아무 곳이나 터치하여 군주를 그 방향으로 이동</span></div>
+            <div class="guide-key-item"><span class="key-badge">👆 화면 탭</span><span class="key-desc">건설 모드 활성화 후 원하는 위치를 탭하여 건물 배치</span></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">⚔️ 유닛 & 건물 소환 (하단 버튼)</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge mobile-badge">🛡️ 보병</span><span class="key-desc">하단 상점에서 아이콘 버튼 탭 → 즉시 소환 (💰 20G)</span></div>
+            <div class="guide-key-item"><span class="key-badge mobile-badge">🏹 궁수</span><span class="key-desc">하단 상점에서 탭 → 즉시 소환 (💰 35G)</span></div>
+            <div class="guide-key-item"><span class="key-badge mobile-badge">⛏️ 금광</span><span class="key-desc">버튼 탭 후 → 맵을 탭하여 배치 (💰 250G)</span></div>
+            <div class="guide-key-item"><span class="key-badge mobile-badge">🏠 집</span><span class="key-desc">버튼 탭 후 → 맵을 탭하여 배치 (💰 250G)</span></div>
+            <div class="guide-key-item"><span class="key-badge mobile-badge">🏰 타워</span><span class="key-desc">아처/메이지타워 탭 후 → 배치 (💰 500~1500G)</span></div>
+            <div class="guide-key-item"><span class="key-badge mobile-badge">🛖 병영</span><span class="key-desc">병영/마구간/공성소 탭 후 → 배치하여 자동 생산 시작</span></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">📐 모바일 최적화 팁</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">🔄</span><span class="key-desc">스마트폰은 반드시 <strong>가로(Landscape) 모드</strong>로 회전하여 플레이</span></div>
+            <div class="guide-key-item"><span class="key-badge">📺</span><span class="key-desc">전체 화면 모드를 활성화하면 더 넓은 시야로 전장 파악 가능</span></div>
+            <div class="guide-key-item"><span class="key-badge">🗺️</span><span class="key-desc">우측 하단 <strong>미니맵(Strategic Radar)</strong>을 수시로 확인하여 적 위치 파악</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 전략 팁 탭 -->
+      <div id="tab-strategy" class="guide-tab-content">
+        <div class="guide-section">
+          <h3 class="guide-section-title">💰 골드 & 경제 운영</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc">초반에 <strong>금광(⛏️)</strong>을 빠르게 지어 골드 수입원 확보 필수</span></div>
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc">전장에 자동 생성되는 <strong>금화 코인</strong>을 직접 밟아 획득 가능</span></div>
+            <div class="guide-key-item"><span class="key-badge">🧲</span><span class="key-desc"><strong>골드 자석 아이템</strong> 획득 시 주변 코인이 자동 흡입(15초)</span></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">🏰 기지 건설 전략</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc"><strong>집(🏠)</strong>을 지어 인구수를 늘려야 대군 유지 가능 (기본 20, +15/채)</span></div>
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc"><strong>병영 → 마구간 → 공성소</strong> 순으로 고티어 유닛 생산 루트 확보</span></div>
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc">요새 주변에 <strong>아처타워 + 메이지타워</strong> 복합 배치로 난공불락 방어선 구축</span></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">⚔️ 전투 & 버프 아이템</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">❤️</span><span class="key-desc"><strong>힐 포션</strong> — 즉시 체력 100 회복. 위기 상황에 적극 수집</span></div>
+            <div class="guide-key-item"><span class="key-badge">⚡</span><span class="key-desc"><strong>스피드 물약</strong> — 군주 & 병사 전체 속도 1.5배 (10초). 기습 & 도주에 활용</span></div>
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc">적 군주보다 병력이 적으면 전투 회피 후 병력 충원 우선</span></div>
+            <div class="guide-key-item"><span class="key-badge">💡</span><span class="key-desc"><strong>투석기(🪨)</strong>는 원거리 범위 공격으로 밀집 적 무리에 최고 효율</span></div>
+          </div>
+        </div>
+
+        <div class="guide-section">
+          <h3 class="guide-section-title">🌐 멀티플레이 가이드</h3>
+          <div class="guide-grid">
+            <div class="guide-key-item"><span class="key-badge">1</span><span class="key-desc">방장이 <strong>방 개설하기</strong> 클릭 → 4자리 방 코드 생성</span></div>
+            <div class="guide-key-item"><span class="key-badge">2</span><span class="key-desc">친구에게 방 코드 전달 → 친구는 <strong>방 참가</strong>에 코드 입력</span></div>
+            <div class="guide-key-item"><span class="key-badge">3</span><span class="key-desc">대기실 확인 후 방장이 <strong>게임 시작</strong> 버튼 클릭 → 실시간 배틀!</span></div>
+            <div class="guide-key-item"><span class="key-badge">🎨</span><span class="key-desc">참가 순서대로 <strong>고유 색상(빨·주·노·초·파·남·보)</strong>이 자동 부여됨</span></div>
+          </div>
+        </div>
+      </div>
+
+      <button id="closeGuideBottomBtn" class="primary-btn guide-bottom-close">🎮 게임 시작하러 가기!</button>
+    </div>
+  </div>
+
   <!-- 메인 게임 캔버스 -->
   <canvas id="gameCanvas"></canvas>
+
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>

@@ -734,5 +734,227 @@ body, html {
   color: white;
 }
 
+/* ===================================================
+   조작 방법 가이드 팝업 모달 스타일
+   =================================================== */
+
+/* 오버레이 배경 */
+.guide-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(5, 9, 20, 0.92);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: fadeIn 0.25s ease;
+}
+
+/* 모달 본체 */
+.guide-modal-box {
+  position: relative;
+  width: 100%;
+  max-width: 860px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: linear-gradient(145deg, rgba(15,23,42,0.98) 0%, rgba(30,17,60,0.98) 100%);
+  border: 1px solid rgba(124, 58, 237, 0.4);
+  border-radius: 24px;
+  padding: 2rem 2.2rem 1.8rem;
+  box-shadow: 0 0 60px rgba(124,58,237,0.25), 0 0 120px rgba(6,182,212,0.1);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,58,237,0.4) transparent;
+}
+
+.guide-modal-box::-webkit-scrollbar { width: 6px; }
+.guide-modal-box::-webkit-scrollbar-track { background: transparent; }
+.guide-modal-box::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.4); border-radius: 3px; }
+
+/* 닫기 버튼 (우측 상단) */
+.guide-close-btn {
+  position: absolute;
+  top: 1rem;
+  right: 1.2rem;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 50%;
+  background: rgba(255,255,255,0.05);
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  pointer-events: all;
+}
+.guide-close-btn:hover {
+  background: rgba(239,68,68,0.15);
+  border-color: #ef4444;
+  color: #f87171;
+  transform: scale(1.1);
+}
+
+/* 헤더 */
+.guide-header { text-align: center; margin-bottom: 1.5rem; }
+.guide-logo {
+  font-size: 1.8rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  background: linear-gradient(135deg, #06b6d4, #7c3aed);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.guide-subtitle {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+  letter-spacing: 0.05em;
+}
+
+/* 탭 버튼 */
+.guide-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 0.8rem;
+  flex-wrap: wrap;
+}
+.guide-tab {
+  padding: 0.5rem 1.1rem;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px;
+  background: rgba(255,255,255,0.04);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  pointer-events: all;
+}
+.guide-tab:hover {
+  background: rgba(124,58,237,0.15);
+  color: white;
+  border-color: rgba(124,58,237,0.4);
+}
+.guide-tab.active {
+  background: linear-gradient(135deg, rgba(124,58,237,0.3), rgba(6,182,212,0.2));
+  border-color: #7c3aed;
+  color: white;
+}
+
+/* 탭 콘텐츠 */
+.guide-tab-content { display: none; }
+.guide-tab-content.active { display: block; animation: fadeIn 0.2s ease; }
+
+/* 섹션 */
+.guide-section {
+  margin-bottom: 1.4rem;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 1.1rem 1.3rem;
+}
+.guide-section-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #06b6d4;
+  margin-bottom: 0.8rem;
+  letter-spacing: 0.03em;
+}
+
+/* 키 아이템 그리드 */
+.guide-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.guide-key-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.guide-key-item:last-child { border-bottom: none; }
+
+/* 키 배지 */
+.key-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 0.25rem 0.6rem;
+  background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(6,182,212,0.15));
+  border: 1px solid rgba(124,58,237,0.4);
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #a78bfa;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mobile-badge {
+  background: linear-gradient(135deg, rgba(6,182,212,0.25), rgba(16,185,129,0.15));
+  border-color: rgba(6,182,212,0.4);
+  color: #67e8f9;
+  font-family: inherit;
+  font-size: 0.75rem;
+}
+
+/* 키 설명 */
+.key-desc {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+.key-desc strong { color: #e2e8f0; }
+
+/* 힌트 텍스트 */
+.guide-hint {
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.8rem;
+  background: rgba(6,182,212,0.08);
+  border-left: 3px solid #06b6d4;
+  border-radius: 0 8px 8px 0;
+  font-size: 0.82rem;
+  color: #67e8f9;
+}
+
+/* 하단 닫기 버튼 */
+.guide-bottom-close {
+  display: block;
+  width: 100%;
+  margin-top: 1.2rem;
+  pointer-events: all;
+  font-size: 1rem;
+}
+
+/* 애니메이션 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 반응형: 모바일 화면 */
+@media (max-width: 600px) {
+  .guide-modal-box {
+    padding: 1.2rem 1rem 1.2rem;
+    border-radius: 16px;
+  }
+  .guide-tabs { gap: 0.3rem; }
+  .guide-tab { font-size: 0.75rem; padding: 0.4rem 0.7rem; }
+  .guide-logo { font-size: 1.4rem; }
+  .key-badge { min-width: 36px; font-size: 0.75rem; }
+  .key-desc { font-size: 0.78rem; }
+}
 
 

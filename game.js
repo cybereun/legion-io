@@ -2794,10 +2794,59 @@ document.getElementById("enterLobbyBtn").addEventListener("click", () => {
   currentGameState = GAME_STATE.LOBBY;
 });
 
+// [가이드 팝업] 열기 / 닫기 로직
+(function setupGuideModal() {
+  const modal    = document.getElementById('guideModal');
+  const openBtn  = document.getElementById('openGuideBtn');
+  const closeBtn = document.getElementById('closeGuideBtn');
+  const closeBtmBtn = document.getElementById('closeGuideBottomBtn');
+  const tabs     = document.querySelectorAll('.guide-tab');
+  const contents = document.querySelectorAll('.guide-tab-content');
+
+  function openModal() {
+    modal.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    modal.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  // 버튼 이벤트
+  if (openBtn)     openBtn.addEventListener('click', openModal);
+  if (closeBtn)    closeBtn.addEventListener('click', closeModal);
+  if (closeBtmBtn) closeBtmBtn.addEventListener('click', closeModal);
+
+  // 오버레이 클릭(모달 바깥) → 닫기
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  // ESC 키 → 닫기
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+      closeModal();
+    }
+  });
+
+  // 탭 전환 로직
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = tab.dataset.tab;
+      tabs.forEach(t => t.classList.remove('active'));
+      contents.forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      const targetContent = document.getElementById('tab-' + target);
+      if (targetContent) targetContent.classList.add('active');
+    });
+  });
+})();
+
 // 1. 오프라인 싱글플레이 버튼 리스너
 document.getElementById("startSingleBtn").addEventListener("click", () => {
   initGame(false);
 });
+
 
 // 2. 멀티플레이 방 개설 (Host) 버튼 리스너
 document.getElementById("createRoomBtn").addEventListener("click", () => {
