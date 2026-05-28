@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>리전 아이오 (Legion.io) | 대규모 군집 전투 게임</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 게임 오버레이 HUD -->
+  <div id="gameHUD" class="hud-container hidden">
+    <!-- 좌측 상단: 군주 상태 및 통계 -->
+    <div class="hud-card player-stats">
+      <div class="player-profile">
+        <span class="profile-icon">👑</span>
+        <div class="profile-info">
+          <h2 id="playerName">Player</h2>
+          <div class="health-bar-container">
+            <div id="playerHealth" class="health-bar-fill" style="width: 100%;"></div>
+          </div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">💰 보유 골드:</span>
+        <span id="goldCount" class="stat-value text-gold">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">⚔️ 군대 규모:</span>
+        <span id="armyCount" class="stat-value text-cyan">0 / 20</span>
+      </div>
+    </div>
+
+    <!-- 우측 상단: 실시간 리더보드 -->
+    <div class="hud-card leaderboard">
+      <h3>🏆 LEADERBOARD</h3>
+      <ol id="leaderboardList">
+        <!-- JS에서 실시간으로 삽입함 -->
+      </ol>
+    </div>
+
+    <!-- 하단 중앙: 소환 & 건설 상점 -->
+    <div class="hud-card shop-bar">
+      <!-- 유닛 소환 -->
+      <div class="shop-item" onclick="spawnUnit('soldier')" title="단축키 1">
+        <div class="unit-preview soldier-icon">🛡️</div>
+        <div class="unit-info">
+          <span class="unit-name">보병</span>
+          <span class="unit-cost">💰 20G</span>
+        </div>
+      </div>
+      <div class="shop-item" onclick="spawnUnit('archer')" title="단축키 2">
+        <div class="unit-preview archer-icon">🏹</div>
+        <div class="unit-info">
+          <span class="unit-name">궁수</span>
+          <span class="unit-cost">💰 35G</span>
+        </div>
+      </div>
+      
+      <div class="shop-divider"></div>
+
+      <!-- 기지 경제 & 방어 건물 -->
+      <div class="shop-item" onclick="startBuilding('mine')" title="단축키 3">
+        <div class="unit-preview mine-icon">⛏️</div>
+        <div class="unit-info">
+          <span class="unit-name">금광</span>
+          <span class="unit-cost">💰 250G</span>
+        </div>
+      </div>
+      <div class="shop-item" onclick="startBuilding('house')" title="단축키 4">
+        <div class="unit-preview house-icon">🏠</div>
+        <div class="unit-info">
+          <span class="unit-name">집</span>
+          <span class="unit-cost">💰 250G</span>
+        </div>
+      </div>
+      <div class="shop-item" onclick="startBuilding('archerTower')" title="단축키 5">
+        <div class="unit-preview tower-icon">🏰</div>
+        <div class="unit-info">
+          <span class="unit-name">아처타워</span>
+          <span class="unit-cost">💰 500G</span>
+        </div>
+      </div>
+      <div class="shop-item" onclick="startBuilding('mageTower')" title="단축키 6">
+        <div class="unit-preview mage-icon">🔮</div>
+        <div class="unit-info">
+          <span class="unit-name">메이지타워</span>
+          <span class="unit-cost">💰 1500G</span>
+        </div>
+      </div>
+
+      <div class="shop-divider"></div>
+
+      <!-- RTS 생산형 건물 -->
+      <div class="shop-item" onclick="startBuilding('barracks')" title="단축키 Q">
+        <div class="unit-preview barracks-icon">🛖</div>
+        <div class="unit-info">
+          <span class="unit-name">병영</span>
+          <span class="unit-cost">💰 400G</span>
+        </div>
+      </div>
+      <div class="shop-item" onclick="startBuilding('stable')" title="단축키 W">
+        <div class="unit-preview stable-icon">🐴</div>
+        <div class="unit-info">
+          <span class="unit-name">마구간</span>
+          <span class="unit-cost">💰 800G</span>
+        </div>
+      </div>
+      <div class="shop-item" onclick="startBuilding('siegeWorkshop')" title="단축키 E">
+        <div class="unit-preview siege-icon">⚙️</div>
+        <div class="unit-info">
+          <span class="unit-name">공성소</span>
+          <span class="unit-cost">💰 1200G</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 조작 가이드 안내 -->
+    <div class="control-guide">
+      🖱️ 마우스: 군주 이동 | ⌨️ 1~2: 보병/궁수 소환 | ⌨️ 3~6: 기지/방어 | ⌨️ Q~E: 생산 건물 | ❌ ESC: 취소
+    </div>
+
+    <!-- 우측 하단 실시간 미니맵 -->
+    <div id="miniMapContainer" class="hud-card mini-map-card">
+      <div class="mini-map-title">🛰️ STRATEGIC RADAR</div>
+      <canvas id="miniMapCanvas" width="130" height="130"></canvas>
+    </div>
+
+    <!-- 대시보드 내 중앙 닉네임 시작 카드 (싱글/멀티 선택) -->
+    <div id="lobbyStartCard" class="lobby-start-card">
+      <div class="menu-box">
+        <div class="menu-logo">🪐 LEGION.IO</div>
+        <p class="menu-desc">닉네임을 설정하고 오프라인 싱글플레이 또는 멀티플레이 방에 참여하세요.</p>
+        <div class="input-group">
+          <label for="nameInput">군주 닉네임 설정</label>
+          <input type="text" id="nameInput" value="Chisok" maxlength="10">
+        </div>
+        
+        <div class="lobby-action-group">
+          <button id="startSingleBtn" class="primary-btn">오프라인 싱글플레이 시작</button>
+          
+          <div class="lobby-divider"><span>OR MULTIPLAYER</span></div>
+          
+          <button id="createRoomBtn" class="secondary-btn">방 개설하기 (Host)</button>
+          
+          <div class="input-row">
+            <input type="text" id="roomCodeInput" placeholder="방 코드 입력" maxlength="5">
+            <button id="joinRoomBtn" class="join-btn">방 참가</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 멀티플레이 대기방 (Waiting Room) 카드 -->
+    <div id="lobbyWaitingRoom" class="lobby-waiting-card hidden">
+      <div class="menu-box">
+        <div class="menu-logo">🪐 WAITING ROOM</div>
+        <p class="menu-desc">친구들에게 아래 방 코드를 알려주세요!</p>
+        
+        <div class="room-code-display">
+          <span class="code-label">ROOM CODE</span>
+          <span id="displayRoomCode" class="code-value">-----</span>
+        </div>
+
+        <div class="waiting-players-section">
+          <h3>👥 대기실 플레이어 목록 (<span id="waitingPlayerCount">0</span>/6)</h3>
+          <ul id="waitingPlayerList">
+            <!-- 대시보드 로비 인원 자동 렌더링 -->
+          </ul>
+        </div>
+
+        <div class="room-actions">
+          <button id="startMultiGameBtn" class="primary-btn hidden">게임 시작 (방장전용)</button>
+          <p id="waitingMessage" class="waiting-msg">방장이 게임을 시작하기를 기다리는 중...</p>
+          <button id="leaveRoomBtn" class="danger-btn">방 나가기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 대기실 / 게임 시작 화면 (랜딩 화면) -->
+  <div id="landingScreen" class="screen-overlay">
+    <div class="menu-box">
+      <div class="menu-logo">🪐 LEGION.IO</div>
+      <p class="menu-desc">금화를 모으고 대군을 육성하여 적 군주들을 처단하세요!</p>
+      <button id="enterLobbyBtn" class="primary-btn">대시보드 시작</button>
+    </div>
+  </div>
+
+  <!-- 게임 오버 화면 -->
+  <div id="gameOverScreen" class="screen-overlay hidden">
+    <div class="menu-box border-red">
+      <div class="menu-logo text-red">☠️ GAME OVER</div>
+      <p id="gameOverMsg" class="menu-desc">군주가 전사하였습니다.</p>
+      
+      <button id="restartBtn" class="primary-btn">다시 시작</button>
+    </div>
+  </div>
+
+  <!-- 세로 모드 회전 유도 화면 -->
+  <div id="orientationBarrier" class="screen-overlay">
+    <div class="menu-box">
+      <div class="rotate-icon">🔄</div>
+      <div class="menu-logo">가로 모드 회전</div>
+      <p class="menu-desc">원활한 게임 플레이를 위해 휴대폰을 가로 방향으로 돌려주세요.</p>
+    </div>
+  </div>
+
+  <!-- 메인 게임 캔버스 -->
+  <canvas id="gameCanvas"></canvas>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
