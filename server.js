@@ -6,7 +6,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
-const STATIC_ROOT = __dirname;
+const STATIC_ROOT = path.join(__dirname, 'public');
 const IS_VERCEL = Boolean(process.env.VERCEL);
 
 const PORT = process.env.PORT || 8000;
@@ -32,11 +32,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// 정적 파일 호스팅 (현재 폴더 전체 서빙)
+// 정적 파일 호스팅 (Vercel 배포와 동일한 public 루트 사용)
 app.use(express.static(STATIC_ROOT, { index: false }));
 
-// Vercel/Express 양쪽에서 루트와 SPA fallback을 확실히 index.html로 연결합니다.
-// 이전 배포에서는 Vercel이 Express 엔트리만 실행하면서 `/`가 `Cannot GET /`로 떨어졌습니다.
+// Express 로컬 서버에서도 루트와 SPA fallback을 index.html로 연결합니다.
 app.get(['/', '/index.html'], (req, res) => {
   res.sendFile(path.join(STATIC_ROOT, 'index.html'));
 });
