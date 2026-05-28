@@ -276,6 +276,55 @@ const camera = {
   zoom: 1
 };
 
+function getCameraZoomMargin() {
+  const zoom = Math.max(camera.zoom || 1, 0.001);
+  return {
+    x: (camera.width / zoom - camera.width) / 2,
+    y: (camera.height / zoom - camera.height) / 2
+  };
+}
+
+function getVisibleWorldBounds(padding = 0) {
+  const margin = getCameraZoomMargin();
+  return {
+    left: camera.x - margin.x - padding,
+    top: camera.y - margin.y - padding,
+    right: camera.x + camera.width + margin.x + padding,
+    bottom: camera.y + camera.height + margin.y + padding
+  };
+}
+
+function clampCameraToWorld() {
+  const margin = getCameraZoomMargin();
+  const minX = margin.x;
+  const minY = margin.y;
+  const maxX = WORLD_SIZE - camera.width - margin.x;
+  const maxY = WORLD_SIZE - camera.height - margin.y;
+
+  camera.x = maxX < minX
+    ? (WORLD_SIZE - camera.width) / 2
+    : Math.max(minX, Math.min(maxX, camera.x));
+  camera.y = maxY < minY
+    ? (WORLD_SIZE - camera.height) / 2
+    : Math.max(minY, Math.min(maxY, camera.y));
+}
+
+function screenToWorld(screenX, screenY) {
+  const zoom = Math.max(camera.zoom || 1, 0.001);
+  return {
+    x: camera.x + camera.width / 2 + (screenX - camera.width / 2) / zoom,
+    y: camera.y + camera.height / 2 + (screenY - camera.height / 2) / zoom
+  };
+}
+
+function isWorldCircleVisible(worldX, worldY, radius = 0, padding = 0) {
+  const bounds = getVisibleWorldBounds(radius + padding);
+  return worldX >= bounds.left &&
+    worldX <= bounds.right &&
+    worldY >= bounds.top &&
+    worldY <= bounds.bottom;
+}
+
 // 엔티티 배열
 let player = null;
 let kings = []; // 플레이어와 봇 군주들
@@ -356,6 +405,7 @@ function resizeCanvas() {
   canvas.height = window.innerHeight;
   camera.width = canvas.width;
   camera.height = canvas.height;
+  clampCameraToWorld();
 }
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
@@ -374,10 +424,9 @@ window.addEventListener("mousedown", (e) => {
   if (e.target.closest('.hud-card') || e.target.closest('.screen-overlay')) return;
 
   if (buildMode.active) {
-    const worldClickX = mouseX + camera.x;
-    const worldClickY = mouseY + camera.y;
+    const worldClick = screenToWorld(mouseX, mouseY);
     
-    executeBuildingPlacement(player, worldClickX, worldClickY);
+    executeBuildingPlacement(player, worldClick.x, worldClick.y);
   }
 });
 
@@ -497,7 +546,7 @@ class Coin {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -50 || screenX > camera.width + 50 || screenY < -50 || screenY > camera.height + 50) return;
+    if (!isWorldCircleVisible(this.x, this.y, drawRadius, 50)) return;
 
     ctx.save();
     ctx.shadowColor = "rgba(251, 191, 36, 0.4)";
@@ -530,8 +579,7 @@ class Obstacle {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -this.radius || screenX > camera.width + this.radius || 
-        screenY < -this.radius || screenY > camera.height + this.radius) return;
+    if (!isWorldCircleVisible(this.x, this.y, this.radius)) return;
 
     ctx.save();
     ctx.shadowColor = "rgba(0, 0, 0, 0.15)";
@@ -607,7 +655,7 @@ class Item {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -50 || screenX > camera.width + 50 || screenY < -50 || screenY > camera.height + 50) return;
+    if (!isWorldCircleVisible(this.x, this.y, this.radius, 50)) return;
 
     const scale = 1 + Math.sin(this.pulseAngle) * 0.1;
     const drawRadius = this.radius * scale;
@@ -760,8 +808,9 @@ class King extends Entity {
     let targetAngle = this.angle;
 
     if (!this.isBot) {
-      const worldMouseX = mouseX + camera.x;
-      const worldMouseY = mouseY + camera.y;
+      const worldMouse = screenToWorld(mouseX, mouseY);
+      const worldMouseX = worldMouse.x;
+      const worldMouseY = worldMouse.y;
       const dx = worldMouseX - this.x;
       const dy = worldMouseY - this.y;
       const dist = Math.hypot(dx, dy);
@@ -988,7 +1037,7 @@ class King extends Entity {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -50 || screenX > camera.width + 50 || screenY < -50 || screenY > camera.height + 50) return;
+    if (!isWorldCircleVisible(this.x, this.y, this.radius, 50)) return;
 
     ctx.save();
     ctx.shadowColor = this.teamColor.main;
@@ -1360,7 +1409,7 @@ class Unit extends Entity {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -30 || screenX > camera.width + 30 || screenY < -30 || screenY > camera.height + 30) return;
+    if (!isWorldCircleVisible(this.x, this.y, this.radius, 30)) return;
 
     ctx.save();
     ctx.translate(screenX, screenY);
@@ -1703,8 +1752,7 @@ class Building extends Entity {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -this.radius * 2 || screenX > camera.width + this.radius * 2 || 
-        screenY < -this.radius * 2 || screenY > camera.height + this.radius * 2) return;
+    if (!isWorldCircleVisible(this.x, this.y, this.radius * 2)) return;
 
     ctx.save();
     
@@ -2047,7 +2095,7 @@ class Projectile {
     const screenX = this.x - camera.x;
     const screenY = this.y - camera.y;
 
-    if (screenX < -15 || screenX > camera.width + 15 || screenY < -15 || screenY > camera.height + 15) return;
+    if (!isWorldCircleVisible(this.x, this.y, 15)) return;
 
     ctx.save();
     ctx.translate(screenX, screenY);
@@ -2342,6 +2390,7 @@ function initGame(isMulti = false, mapData = null, roomPlayers = null) {
   camera.x = player.x - camera.width / 2;
   camera.y = player.y - camera.height / 2;
   camera.zoom = 1; // 카메라 줌 초기화
+  clampCameraToWorld();
 
   currentGameState = GAME_STATE.PLAYING;
   document.getElementById("gameOverScreen").classList.add("hidden");
@@ -2476,8 +2525,7 @@ function update() {
     camera.x += (targetCamX - camera.x) * 0.1;
     camera.y += (targetCamY - camera.y) * 0.1;
 
-    camera.x = Math.max(0, Math.min(WORLD_SIZE - camera.width, camera.x));
-    camera.y = Math.max(0, Math.min(WORLD_SIZE - camera.height, camera.y));
+    clampCameraToWorld();
   }
 
   // 봇 리스폰 (싱글플레이어 모드일 때만 실행)
@@ -2586,11 +2634,12 @@ function draw() {
 
   // 바둑판형 풀밭 그리기 (스케일 다운 대응하여 격자 간격 조정 160 -> 100)
   const tileSize = 100;
-  const startX = Math.floor(camera.x / tileSize) * tileSize;
-  const startY = Math.floor(camera.y / tileSize) * tileSize;
+  const visibleBounds = getVisibleWorldBounds(tileSize);
+  const startX = Math.floor(visibleBounds.left / tileSize) * tileSize;
+  const startY = Math.floor(visibleBounds.top / tileSize) * tileSize;
 
-  for (let x = startX; x < camera.x + camera.width + tileSize; x += tileSize) {
-    for (let y = startY; y < camera.y + camera.height + tileSize; y += tileSize) {
+  for (let x = startX; x < visibleBounds.right + tileSize; x += tileSize) {
+    for (let y = startY; y < visibleBounds.bottom + tileSize; y += tileSize) {
       if (x >= WORLD_SIZE || y >= WORLD_SIZE || x < 0 || y < 0) continue;
       
       const gridX = Math.floor(x / tileSize);
@@ -2643,8 +2692,9 @@ function draw() {
     const spec = BUILDING_SPECS[buildMode.type];
     
     // 마우스의 월드 좌표 연산
-    const wx = mouseX + camera.x;
-    const wy = mouseY + camera.y;
+    const worldMouse = screenToWorld(mouseX, mouseY);
+    const wx = worldMouse.x;
+    const wy = worldMouse.y;
 
     // 건설 적합 여부 판단 (충돌 검사)
     let isBlocked = false;
@@ -2671,7 +2721,7 @@ function draw() {
 
     // 가이드 원
     ctx.beginPath();
-    ctx.arc(mouseX, mouseY, spec.radius, 0, Math.PI * 2);
+    ctx.arc(wx - camera.x, wy - camera.y, spec.radius, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
@@ -2680,7 +2730,7 @@ function draw() {
     ctx.strokeStyle = "rgba(255, 255, 255, 0.3)";
     ctx.beginPath();
     ctx.moveTo(player.x - camera.x, player.y - camera.y);
-    ctx.lineTo(mouseX, mouseY);
+    ctx.lineTo(wx - camera.x, wy - camera.y);
     ctx.stroke();
     
     ctx.restore();
