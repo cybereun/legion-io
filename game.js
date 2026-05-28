@@ -2849,21 +2849,23 @@ document.getElementById("startSingleBtn").addEventListener("click", () => {
 
 
 // 2. 멀티플레이 방 개설 (Host) 버튼 리스너
-document.getElementById("createRoomBtn").addEventListener("click", () => {
+document.getElementById("createRoomBtn").addEventListener("click", async () => {
   const nickname = document.getElementById("nameInput").value.trim() || "Chisok";
-  initSocket();
+  const connected = await initSocket();
+  if (!connected || !socket) return;
   socket.emit('createRoom', { nickname: nickname });
 });
 
 // 3. 멀티플레이 방 참가 (Guest) 버튼 리스너
-document.getElementById("joinRoomBtn").addEventListener("click", () => {
+document.getElementById("joinRoomBtn").addEventListener("click", async () => {
   const nickname = document.getElementById("nameInput").value.trim() || "Guest";
   const rCode = document.getElementById("roomCodeInput").value.trim();
   if (!rCode) {
     alert("방 코드를 입력해주세요!");
     return;
   }
-  initSocket();
+  const connected = await initSocket();
+  if (!connected || !socket) return;
   socket.emit('joinRoom', { nickname: nickname, roomCode: rCode });
 });
 
@@ -2900,9 +2902,36 @@ document.getElementById("restartBtn").addEventListener("click", () => {
   currentGameState = GAME_STATE.LOBBY;
 });
 
+// Socket.IO 클라이언트를 필요할 때만 로드합니다.
+// Vercel 정적 배포에서는 Node/Socket.IO 서버가 없으므로 싱글플레이 화면 로딩을 방해하지 않게 합니다.
+function loadSocketIoClient() {
+  if (typeof io === 'function') return Promise.resolve(true);
+  if (window.__socketIoClientLoading) return window.__socketIoClientLoading;
+
+  window.__socketIoClientLoading = new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = '/socket.io/socket.io.js';
+    script.async = true;
+    script.onload = () => resolve(typeof io === 'function');
+    script.onerror = () => {
+      console.warn('Socket.IO client is not available in this deployment. Multiplayer is disabled.');
+      resolve(false);
+    };
+    document.head.appendChild(script);
+  });
+
+  return window.__socketIoClientLoading;
+}
+
 // 소켓 연동 초기화
-function initSocket() {
-  if (socket && socket.connected) return;
+async function initSocket() {
+  if (socket && socket.connected) return true;
+
+  const socketIoAvailable = await loadSocketIoClient();
+  if (!socketIoAvailable) {
+    alert('현재 Vercel 정적 배포에서는 멀티플레이 서버가 연결되지 않았습니다. 오프라인 싱글플레이를 이용해주세요.');
+    return false;
+  }
   
   socket = io();
 
@@ -3141,6 +3170,8 @@ function initSocket() {
       item.color = data.newColor;
     }
   });
+
+  return true;
 }
 
 // 대기실 참가자 명단 렌더링

@@ -1,6 +1,11 @@
 {
-  "name": "lordzio-local-install",
+  "name": "legion-io",
   "version": "1.0.0",
+  "description": "Legion.io browser game",
+  "scripts": {
+    "start": "node server.js",
+    "vercel-build": "echo Static deployment ready"
+  },
   "dependencies": {
     "express": "^4.19.2",
     "socket.io": "^4.7.5"

@@ -354,7 +354,8 @@
   <canvas id="gameCanvas"></canvas>
 
 
-  <script src="/socket.io/socket.io.js"></script>
+  <!-- Socket.IO 클라이언트는 멀티플레이 버튼을 누를 때 game.js에서 지연 로드합니다.
+       Vercel 정적 배포에서는 /socket.io/socket.io.js가 없어서 초기 404를 막기 위함입니다. -->
   <script src="game.js"></script>
 </body>
 </html>
