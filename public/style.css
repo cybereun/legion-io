@@ -1232,4 +1232,52 @@ body.mobile-phone .building-upgrade-card {
   }
 }
 
+/* 일시정지 및 종료 버튼 스타일 */
+.pause-btn {
+  position: absolute;
+  left: 1.5rem;
+  top: 10.5rem; /* 프로필창 밑에 배치 */
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  cursor: pointer;
+  z-index: 10;
+  transition: all 0.2s ease;
+  border-radius: 50% !important; /* 동그랗게 처리 */
+  padding: 0 !important;
+}
+
+.pause-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+}
+
+.quit-btn {
+  border: 1px solid rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #fca5a5 !important;
+  font-weight: 700;
+  transition: all 0.3s ease;
+}
+
+.quit-btn:hover {
+  background: rgba(239, 68, 68, 0.35) !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+  transform: translateY(-2px);
+}
+
+/* 모바일 디바이스 가로모드 시 크기 축소 */
+@media (max-width: 950px), (max-height: 550px) {
+  .pause-btn {
+    left: 1.0rem;
+    top: 7.5rem;
+    width: 38px;
+    height: 38px;
+    font-size: 1rem;
+  }
+}
+
 

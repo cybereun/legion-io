@@ -39,6 +39,9 @@
       </ol>
     </div>
 
+    <!-- 일시정지 버튼 -->
+    <button id="pauseGameBtn" class="hud-card pause-btn" onclick="pauseGame()" title="일시정지">⏸️</button>
+
     <!-- 하단 중앙: 소환 & 건설 상점 -->
     <div class="hud-card shop-bar">
       <!-- 유닛 소환 -->
@@ -167,6 +170,7 @@
             <input type="text" id="roomCodeInput" placeholder="방 코드 입력" maxlength="5">
             <button id="joinRoomBtn" class="join-btn">방 참가</button>
           </div>
+          <button id="quitGameBtn" class="danger-btn quit-btn" onclick="quitGame()" style="margin-top: 1.2rem; width: 100%;">🚪 게임 종료</button>
         </div>
       </div>
     </div>
@@ -201,6 +205,19 @@
   <!-- 대기실 / 게임 시작 화면 (랜딩 화면) -->
   <div id="landingScreen" class="screen-overlay">
     <button id="enterLobbyBtn" class="primary-btn landing-start-btn">대시보드 시작</button>
+  </div>
+
+  <!-- 일시정지 메뉴 모달 -->
+  <div id="pauseMenuModal" class="screen-overlay hidden">
+    <div class="menu-box">
+      <div class="menu-logo">⏸️ GAME PAUSED</div>
+      <p id="pauseModalDesc" class="menu-desc">게임이 일시정지 되었습니다.</p>
+      
+      <div class="pause-actions" style="display: flex; flex-direction: column; gap: 0.8rem; width: 100%;">
+        <button id="resumeGameBtn" class="primary-btn" onclick="resumeGame()">🎮 게임 재개</button>
+        <button id="exitToDashboardBtn" class="danger-btn" onclick="exitToDashboard()" style="margin-top: 0;">🏠 대시보드로 나가기</button>
+      </div>
+    </div>
   </div>
 
   <!-- 게임 오버 화면 -->

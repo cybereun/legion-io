@@ -307,6 +307,7 @@ let buildMode = {
 };
 
 let selectedBuilding = null;
+let isPaused = false;
 
 // 게임 통계 및 밸런스 설정
 const MAX_COINS = 350;
@@ -2901,6 +2902,7 @@ function update() {
     return;
   }
   if (currentGameState !== GAME_STATE.PLAYING) return;
+  if (isPaused && !isMultiplayer) return;
 
   kings.forEach(king => {
     if (!king.isDead) king.update();
@@ -3889,12 +3891,92 @@ function requestUpgradeSelectedBuilding() {
   showBuildingUpgradeUI(selectedBuilding);
 }
 
+// --- 일시정지 및 대시보드 나가기, 게임 종료 함수 ---
+function pauseGame() {
+  if (currentGameState !== GAME_STATE.PLAYING) return;
+  
+  isPaused = true;
+  document.getElementById("pauseMenuModal").classList.remove("hidden");
+  
+  const desc = document.getElementById("pauseModalDesc");
+  if (isMultiplayer) {
+    desc.innerHTML = `<span style="color: #ef4444; font-weight: bold;">[멀티플레이 경고]</span><br>실시간 멀티플레이어 환경에서는 게임을 일시정지할 수 없습니다.<br>나갈 경우 방에서 즉시 퇴장 처리됩니다.`;
+  } else {
+    desc.innerText = "게임이 일시정지 되었습니다.";
+  }
+}
+
+function resumeGame() {
+  isPaused = false;
+  document.getElementById("pauseMenuModal").classList.add("hidden");
+}
+
+function exitToDashboard() {
+  // 모달 닫기
+  document.getElementById("pauseMenuModal").classList.add("hidden");
+  isPaused = false;
+  
+  // 멀티플레이 방 퇴장 처리
+  if (isMultiplayer && socket) {
+    socket.disconnect();
+    socket = null;
+  }
+  isMultiplayer = false;
+  
+  // 게임 데이터 초기화 (Reset)
+  kings = [];
+  player = null;
+  otherPlayers = {};
+  buildings = [];
+  coins = [];
+  obstacles = [];
+  projectiles = [];
+  particles = [];
+  floatingTexts = [];
+  items = [];
+  selectedBuilding = null;
+  
+  // UI 상태 복구
+  document.getElementById("gameHUD").classList.add("hidden");
+  document.getElementById("gameHUD").classList.add("lobby-bg");
+  document.getElementById("lobbyStartCard").classList.remove("hidden");
+  document.getElementById("lobbyWaitingRoom").classList.add("hidden");
+  document.getElementById("buildingUpgradeUI").classList.add("hidden");
+  
+  // 샵 바 활성화 상태 해제
+  document.querySelector(".shop-bar").classList.add("shop-disabled");
+  
+  currentGameState = GAME_STATE.LOBBY;
+  
+  // 대시보드로 돌아가므로 landingScreen은 hidden으로 두고 바로 lobbyStartCard를 보여줌
+  document.getElementById("gameHUD").classList.remove("hidden");
+}
+
+function quitGame() {
+  // 종료음 재생 시도
+  if (typeof playSound === "function") {
+    try { playSound("destroy"); } catch (e) {}
+  }
+  
+  // 1. window.close() 시도
+  window.close();
+  
+  // 2. 브라우저 정책상 창이 닫히지 않는 경우 대체 팝업 안내
+  setTimeout(() => {
+    alert("브라우저 탭이나 창을 닫아 게임을 종료해 주세요.");
+  }, 100);
+}
+
 // 글로벌 등록
 window.getBuildingEffectText = getBuildingEffectText;
 window.showBuildingUpgradeUI = showBuildingUpgradeUI;
 window.hideBuildingUpgradeUI = hideBuildingUpgradeUI;
 window.executeBuildingUpgrade = executeBuildingUpgrade;
 window.requestUpgradeSelectedBuilding = requestUpgradeSelectedBuilding;
+window.pauseGame = pauseGame;
+window.resumeGame = resumeGame;
+window.exitToDashboard = exitToDashboard;
+window.quitGame = quitGame;
 
 resizeCanvas();
 gameLoop();
