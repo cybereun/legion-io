@@ -1020,10 +1020,15 @@ body.mobile-phone .control-guide {
 }
 
 body.mobile-phone .lobby-start-card,
-body.mobile-phone .lobby-waiting-card,
+body.mobile-phone .lobby-waiting-card {
+  transform: translate(-50%, -50%) scale(0.62);
+  transform-origin: center center;
+}
+
 body.mobile-phone #gameOverScreen .menu-box,
-body.mobile-phone #landingScreen .menu-box {
-  transform: translate(-50%, -50%) scale(0.72);
+body.mobile-phone #landingScreen .menu-box,
+body.mobile-phone #orientationBarrier .menu-box {
+  transform: scale(0.62);
   transform-origin: center center;
 }
 
@@ -1038,10 +1043,66 @@ body.mobile-phone .lobby-waiting-card {
 }
 
 body.mobile-phone .guide-modal-box {
-  transform: scale(0.75);
+  transform: scale(0.7);
   transform-origin: center center;
   max-height: 98vh;
   padding: 1.2rem 1.5rem 1.2rem;
+}
+
+/* 모바일 및 저해상도 화면에서 메뉴 상자 내용물의 크기와 여백 축소 */
+@media (max-width: 950px), (max-height: 550px) {
+  .menu-box {
+    width: min(340px, 90vw);
+    padding: 1.2rem 1.5rem;
+    border-radius: 16px;
+  }
+  .menu-logo {
+    font-size: 1.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .menu-desc {
+    font-size: 0.8rem;
+    margin-bottom: 1rem;
+    line-height: 1.4;
+  }
+  .input-group {
+    margin-bottom: 1rem;
+  }
+  .input-group label {
+    font-size: 0.75rem;
+    margin-bottom: 0.3rem;
+  }
+  .input-group input {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  .primary-btn {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+  .secondary-btn {
+    padding: 0.65rem;
+    font-size: 0.8rem;
+    border-radius: 8px;
+  }
+  .join-btn {
+    padding: 0.65rem 1rem;
+    font-size: 0.8rem;
+    border-radius: 8px;
+  }
+  #roomCodeInput {
+    padding: 0.6rem 0.8rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+  .lobby-action-group {
+    gap: 0.4rem;
+  }
+  .lobby-divider {
+    margin: 0.2rem 0;
+    font-size: 0.7rem;
+  }
 }
 
 
