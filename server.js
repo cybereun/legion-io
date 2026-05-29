@@ -285,12 +285,32 @@ io.on('connection', (socket) => {
       x: data.x,
       y: data.y,
       health: data.health,
-      maxHealth: data.maxHealth
+      maxHealth: data.maxHealth,
+      level: 1
     };
 
     room.buildings.push(building);
     // 방 안의 타인에게 건물 생성 전달
     socket.to(currentRoom).emit('buildingPlaced', building);
+  });
+
+  // 5-2. 기지 건물 업그레이드 동기화
+  socket.on('upgradeBuilding', (data) => {
+    if (!currentRoom || !rooms[currentRoom]) return;
+    const room = rooms[currentRoom];
+    const bld = room.buildings.find(b => b.id === data.id);
+    if (bld) {
+      bld.level = data.level;
+      bld.health = data.health;
+      bld.maxHealth = data.maxHealth;
+      // 방 안의 타인에게 건물 업그레이드 전파
+      socket.to(currentRoom).emit('buildingUpgraded', {
+        id: data.id,
+        level: data.level,
+        health: data.health,
+        maxHealth: data.maxHealth
+      });
+    }
   });
 
   // 6. 건물 데미지 및 파괴 동기화

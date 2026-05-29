@@ -120,6 +120,25 @@
       🖱️ 마우스: 군주 이동 | ⌨️ 1~2: 보병/궁수 소환 | ⌨️ 3~6: 기지/방어 | ⌨️ Q~E: 생산 건물 | ❌ ESC: 취소
     </div>
 
+    <!-- 건물 상세 정보 및 업그레이드 UI 카드 -->
+    <div id="buildingUpgradeUI" class="hud-card building-upgrade-card hidden">
+      <div class="upgrade-header">
+        <span id="upgradeBuildingIcon" class="upgrade-icon">⛏️</span>
+        <div class="upgrade-info">
+          <h3 id="upgradeBuildingName">금광 (Lv. 1)</h3>
+          <span id="upgradeBuildingHealth" class="upgrade-health">HP: 350 / 350</span>
+        </div>
+      </div>
+      <div class="upgrade-details">
+        <p id="upgradeBuildingEffect">현재 효과: 1초당 +3G 자동 채굴</p>
+        <p id="upgradeNextEffect" class="next-effect">다음 효과: 1초당 +8G 자동 채굴</p>
+      </div>
+      <div style="display: flex; gap: 0.5rem; margin-top: 0.8rem;">
+        <button id="upgradeBtn" class="primary-btn upgrade-action-btn" onclick="requestUpgradeSelectedBuilding()" style="flex: 2; margin-top: 0;">🔺 업그레이드 (💰 <span id="upgradeCostValue">1000</span>G)</button>
+        <button id="closeUpgradeUIBtn" class="secondary-btn" onclick="hideBuildingUpgradeUI()" style="flex: 1; margin-top: 0; padding: 0.5rem;">닫기</button>
+      </div>
+    </div>
+
     <!-- 우측 하단 실시간 미니맵 -->
     <div id="miniMapContainer" class="hud-card mini-map-card">
       <div class="mini-map-title">🛰️ STRATEGIC RADAR</div>

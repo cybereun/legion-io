@@ -306,6 +306,8 @@ let buildMode = {
   radius: 0
 };
 
+let selectedBuilding = null;
+
 // 게임 통계 및 밸런스 설정
 const MAX_COINS = 350;
 const MAX_OBSTACLES = 90;
@@ -399,18 +401,36 @@ function handleTouch(e) {
 window.addEventListener("touchstart", handleTouch, { passive: true });
 window.addEventListener("touchmove", handleTouch, { passive: true });
 
-// 마우스 클릭 시 건설 실행
+// 마우스 클릭 시 건설 실행 혹은 건물 선택(업그레이드)
 window.addEventListener("mousedown", (e) => {
   if (currentGameState !== GAME_STATE.PLAYING) return;
   
   // HUD 클릭 시 예외 처리
   if (e.target.closest('.hud-card') || e.target.closest('.screen-overlay')) return;
 
+  const worldClickX = (mouseX - camera.width / 2) / camera.zoom + camera.x + camera.width / 2;
+  const worldClickY = (mouseY - camera.height / 2) / camera.zoom + camera.y + camera.height / 2;
+
   if (buildMode.active) {
-    const worldClickX = (mouseX - camera.width / 2) / camera.zoom + camera.x + camera.width / 2;
-    const worldClickY = (mouseY - camera.height / 2) / camera.zoom + camera.y + camera.height / 2;
-    
     executeBuildingPlacement(player, worldClickX, worldClickY);
+  } else {
+    // 클릭한 좌표가 플레이어 소유의 건물인지 검사
+    let clickedBuilding = null;
+    buildings.forEach(b => {
+      if (b.isDead || b.owner !== player) return;
+      const dist = Math.hypot(b.x - worldClickX, b.y - worldClickY);
+      if (dist < b.radius + 15) {
+        clickedBuilding = b;
+      }
+    });
+
+    if (clickedBuilding) {
+      selectedBuilding = clickedBuilding;
+      showBuildingUpgradeUI(selectedBuilding);
+    } else {
+      selectedBuilding = null;
+      hideBuildingUpgradeUI();
+    }
   }
 });
 
@@ -422,6 +442,8 @@ window.addEventListener("keydown", (e) => {
   
   if (e.key === "Escape") {
     cancelBuildingMode();
+    selectedBuilding = null;
+    hideBuildingUpgradeUI();
   } else if (e.key === "1") {
     spawnUnit("soldier");
   } else if (e.key === "2") {
@@ -756,14 +778,17 @@ class King extends Entity {
         this.x += (this.targetX - this.x) * 0.25;
         this.y += (this.targetY - this.y) * 0.25;
       }
-      // 인구수 한도는 매 프레임 동적 갱신
-      let houseCount = 0;
+      // 인구수 한도는 매 프레임 동적 갱신 (레벨별 인구 기여도 차등화: Lv1=+15, Lv2=+35, Lv3=+65)
+      let housePopulation = 0;
       buildings.forEach(b => {
         if (!b.isDead && b.owner === this && b.buildingType === "house") {
-          houseCount++;
+          const lv = b.level || 1;
+          if (lv === 1) housePopulation += 15;
+          else if (lv === 2) housePopulation += 35;
+          else if (lv === 3) housePopulation += 65;
         }
       });
-      this.maxArmyLimit = 20 + (houseCount * 15);
+      this.maxArmyLimit = 20 + housePopulation;
       return; // 원격 플레이어는 물리 충돌 및 자원 획득 연산을 직접 하지 않고 스킵
     }
 
@@ -871,14 +896,17 @@ class King extends Entity {
       }
     });
 
-    // 동적 인구수 상한 연산 (기본 20 + 소유한 집 개수 * 15)
-    let houseCount = 0;
+    // 동적 인구수 상한 연산 (레벨별 인구 기여도 차등화: Lv1=+15, Lv2=+35, Lv3=+65)
+    let housePopulation = 0;
     buildings.forEach(b => {
       if (!b.isDead && b.owner === this && b.buildingType === "house") {
-        houseCount++;
+        const lv = b.level || 1;
+        if (lv === 1) housePopulation += 15;
+        else if (lv === 2) housePopulation += 35;
+        else if (lv === 3) housePopulation += 65;
       }
     });
-    this.maxArmyLimit = 20 + (houseCount * 15);
+    this.maxArmyLimit = 20 + housePopulation;
   }
 
   updateBotAI() {
@@ -993,6 +1021,27 @@ class King extends Entity {
         const by = this.y + Math.sin(angle) * dist;
         
         executeBuildingPlacement(this, bx, by, typeToBuild);
+      }
+    }
+
+    // 봇 건물 업그레이드 로직 (골드가 충분하고 15% 확률)
+    if (this.gold >= 600 && Math.random() > 0.85) {
+      const myBuildings = buildings.filter(b => !b.isDead && b.owner === this && b.level < 3);
+      if (myBuildings.length > 0) {
+        const targetB = myBuildings[Math.floor(Math.random() * myBuildings.length)];
+        const cost = BUILDING_SPECS[targetB.buildingType].cost * (targetB.level === 1 ? 4 : 8);
+        if (this.gold >= cost) {
+          this.gold -= cost;
+          executeBuildingUpgrade(targetB);
+          
+          if (isMultiplayer && socket) {
+            socket.emit("upgradeBuilding", {
+              id: targetB.id,
+              level: targetB.level,
+              health: targetB.health
+            });
+          }
+        }
       }
     }
   }
@@ -1594,11 +1643,26 @@ class Building extends Entity {
     this.buildingType = buildingType;
     this.lastShotTime = 0;
     this.spawnTimer = 0; // 유닛 자동 생산용 타이머
-    
-    // 타워 공격 속도 셋업
-    this.attackRange = buildingType === "archerTower" ? 220 : 180;
-    this.attackCooldown = buildingType === "archerTower" ? 1000 : 1800;
-    this.damage = buildingType === "archerTower" ? 22 : 40;
+    this.level = 1;
+
+    this.updateSpecsByLevel();
+  }
+
+  updateSpecsByLevel() {
+    const spec = BUILDING_SPECS[this.buildingType];
+    const lv = this.level || 1;
+
+    this.maxHealth = Math.round(spec.maxHealth * (lv === 1 ? 1.0 : lv === 2 ? 1.7 : 2.7));
+
+    if (this.buildingType === "archerTower") {
+      this.attackRange = lv === 1 ? 220 : lv === 2 ? 280 : 350;
+      this.attackCooldown = lv === 1 ? 1000 : lv === 2 ? 800 : 600;
+      this.damage = lv === 1 ? 22 : lv === 2 ? 45 : 80;
+    } else if (this.buildingType === "mageTower") {
+      this.attackRange = lv === 1 ? 180 : lv === 2 ? 240 : 300;
+      this.attackCooldown = lv === 1 ? 1800 : lv === 2 ? 1400 : 1000;
+      this.damage = lv === 1 ? 40 : lv === 2 ? 85 : 160;
+    }
   }
 
   update() {
@@ -1609,11 +1673,15 @@ class Building extends Entity {
       if (!this.goldTimer) this.goldTimer = 60;
       this.goldTimer--;
       if (this.goldTimer <= 0) {
-        this.owner.gold += 3;
+        let goldReward = 3;
+        if (this.level === 2) goldReward = 8;
+        else if (this.level === 3) goldReward = 18;
+
+        this.owner.gold += goldReward;
         this.goldTimer = 60;
         
         if (this.owner === player) {
-          floatingTexts.push(new FloatingText(this.x, this.y - this.radius, `+3G`, "#fbbf24"));
+          floatingTexts.push(new FloatingText(this.x, this.y - this.radius, `+${goldReward}G`, "#fbbf24"));
           for (let i = 0; i < 3; i++) {
             particles.push(new Particle(this.x, this.y, "#fde047", Math.random() * 1.5 + 0.5, Math.random() * Math.PI * 2, 12));
           }
@@ -1633,6 +1701,13 @@ class Building extends Entity {
       let spawnInterval = 360; // 병영 6초 (60프레임 = 1초)
       if (this.buildingType === "stable") spawnInterval = 480; // 마구간 8초
       else if (this.buildingType === "siegeWorkshop") spawnInterval = 720; // 공성소 12초
+      
+      // 레벨에 따른 생산 시간 단축
+      if (this.level === 2) {
+        spawnInterval = Math.round(spawnInterval * 0.75); // 25% 단축
+      } else if (this.level === 3) {
+        spawnInterval = Math.round(spawnInterval * 0.5); // 50% 단축
+      }
       
       if (this.spawnTimer >= spawnInterval) {
         this.spawnTimer = 0;
@@ -1745,188 +1820,600 @@ class Building extends Entity {
     ctx.shadowColor = this.teamColor.main;
     ctx.shadowBlur = 8;
 
+    const lv = this.level || 1;
+
+    // 레벨 텍스트 표시
+    ctx.save();
+    ctx.fillStyle = lv === 3 ? "#f59e0b" : lv === 2 ? "#38bdf8" : "#cbd5e1";
+    ctx.font = "bold 10px Outfit, Noto Sans KR";
+    ctx.textAlign = "center";
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 3;
+    ctx.fillText(`Lv.${lv}`, screenX, screenY - this.radius - 12);
+    ctx.restore();
+
+    // 건물 선택 표시
+    if (typeof selectedBuilding !== 'undefined' && selectedBuilding === this) {
+      ctx.save();
+      ctx.strokeStyle = this.teamColor.accent;
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(screenX, screenY, this.radius + 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
     if (this.buildingType === "mine") {
       // --- 1. 금광 그리기 ---
-      // 나무 기초 프레임
-      ctx.fillStyle = "#78350f";
-      ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
-      ctx.fillStyle = "#a16207";
-      ctx.fillRect(screenX - this.radius + 4, screenY - this.radius + 4, this.radius * 2 - 8, this.radius * 2 - 8);
+      if (lv === 1) {
+        // 나무 기초 프레임
+        ctx.fillStyle = "#78350f";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+        ctx.fillStyle = "#a16207";
+        ctx.fillRect(screenX - this.radius + 4, screenY - this.radius + 4, this.radius * 2 - 8, screenY - this.radius + 4 + this.radius * 2 - 8);
 
-      // 가운데 돌 우물
-      ctx.fillStyle = "#64748b";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius * 0.55, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#334155";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius * 0.35, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 주변에 널려 있는 금더미
-      ctx.fillStyle = "#fbbf24";
-      const goldPiles = [{x:-12,y:-12}, {x:12,y:-10}, {x:-8,y:12}];
-      goldPiles.forEach(p => {
+        // 가운데 돌 우물
+        ctx.fillStyle = "#64748b";
         ctx.beginPath();
-        ctx.arc(screenX + p.x, screenY + p.y, 4.5, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY, this.radius * 0.55, 0, Math.PI * 2);
         ctx.fill();
-      });
+        ctx.fillStyle = "#334155";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 주변에 널려 있는 금더미
+        ctx.fillStyle = "#fbbf24";
+        const goldPiles = [{x:-12,y:-12}, {x:12,y:-10}, {x:-8,y:12}];
+        goldPiles.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(screenX + p.x, screenY + p.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else if (lv === 2) {
+        // 철제 2단계 광산
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+        ctx.strokeStyle = "#475569";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+
+        // 정교한 기계장치 우물
+        ctx.fillStyle = "#1e293b";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 빛나는 금맥 데코
+        ctx.fillStyle = "#fbbf24";
+        const goldPiles = [{x:-14,y:-14}, {x:14,y:-12}, {x:-10,y:14}, {x:12,y:12}];
+        goldPiles.forEach(p => {
+          ctx.beginPath();
+          ctx.arc(screenX + p.x, screenY + p.y, 5.5, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      } else {
+        // 황금 크리스탈 차원문 (3단계)
+        ctx.fillStyle = "#ca8a04";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#eab308";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.9, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 중앙 회전 마법진
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(Date.now() * 0.003);
+        ctx.fillStyle = "#fef08a";
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          ctx.rotate(Math.PI / 2);
+          ctx.fillRect(-4, -this.radius * 0.7, 8, 8);
+        }
+        ctx.restore();
+
+        // 3단계 황금 코어
+        ctx.save();
+        ctx.shadowColor = "#fde047";
+        ctx.shadowBlur = 15;
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 3단계 입자 방출 (가끔)
+        if (Math.random() > 0.92) {
+          particles.push(new Particle(this.x + (Math.random() - 0.5) * 15, this.y + (Math.random() - 0.5) * 15, "#fde047", Math.random() * 1.2 + 0.3, Math.random() * Math.PI * 2, 18));
+        }
+      }
 
     } else if (this.buildingType === "house") {
       // --- 2. 집 그리기 ---
-      // 돌 벽 사각형 (가로 세로)
-      ctx.fillStyle = "#cbd5e1";
-      ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.8, this.radius * 2, this.radius * 1.6);
-      
-      // 빨간 세모 지붕 (두 겹으로 오버랩 입체감)
-      ctx.fillStyle = "#dc2626";
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY - this.radius * 1.4);
-      ctx.lineTo(screenX + this.radius + 3, screenY - this.radius * 0.4);
-      ctx.lineTo(screenX - this.radius - 3, screenY - this.radius * 0.4);
-      ctx.closePath();
-      ctx.fill();
+      if (lv === 1) {
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.8, this.radius * 2, this.radius * 1.6);
+        ctx.fillStyle = "#dc2626";
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.4);
+        ctx.lineTo(screenX + this.radius + 3, screenY - this.radius * 0.4);
+        ctx.lineTo(screenX - this.radius - 3, screenY - this.radius * 0.4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#78350f";
+        ctx.fillRect(screenX - 4, screenY + this.radius * 0.3, 8, this.radius * 0.5);
+      } else if (lv === 2) {
+        // 2단계 대저택
+        ctx.fillStyle = "#e2e8f0"; // 돌 벽
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.9, this.radius * 2, this.radius * 1.8);
+        ctx.fillStyle = "#b91c1c"; // 더 진한 빨강
+        // 이중 지붕
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.6);
+        ctx.lineTo(screenX + this.radius + 4, screenY - this.radius * 0.7);
+        ctx.lineTo(screenX - this.radius - 4, screenY - this.radius * 0.7);
+        ctx.closePath();
+        ctx.fill();
 
-      // 문 그리기
-      ctx.fillStyle = "#78350f";
-      ctx.fillRect(screenX - 4, screenY + this.radius * 0.3, 8, this.radius * 0.5);
+        // 목재 장식 기둥
+        ctx.fillStyle = "#78350f";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.7, 3, this.radius * 1.6);
+        ctx.fillRect(screenX + this.radius - 3, screenY - this.radius * 0.7, 3, this.radius * 1.6);
+
+        // 창문 (노란빛)
+        ctx.fillStyle = "#fef08a";
+        ctx.fillRect(screenX - 10, screenY - 5, 5, 5);
+        ctx.fillRect(screenX + 5, screenY - 5, 5, 5);
+        ctx.fillStyle = "#451a03"; // 어두운 문
+        ctx.fillRect(screenX - 5, screenY + this.radius * 0.4, 10, this.radius * 0.5);
+      } else {
+        // 3단계 왕실 요새 성채 집
+        ctx.fillStyle = "#94a3b8"; // 하얀 돌벽
+        ctx.beginPath();
+        ctx.arc(screenX, screenY + 4, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3단계 첨탑 지붕
+        ctx.fillStyle = "#fbbf24"; // 황금 첨탑
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.7);
+        ctx.lineTo(screenX + this.radius - 2, screenY - this.radius * 0.3);
+        ctx.lineTo(screenX - this.radius + 2, screenY - this.radius * 0.3);
+        ctx.closePath();
+        ctx.fill();
+
+        // 첨탑 위 깃발
+        ctx.strokeStyle = this.teamColor.main;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.7);
+        ctx.lineTo(screenX, screenY - this.radius * 2.1);
+        ctx.lineTo(screenX + 8, screenY - this.radius * 1.95);
+        ctx.lineTo(screenX, screenY - this.radius * 1.8);
+        ctx.stroke();
+
+        // 웅장한 아치형 문
+        ctx.fillStyle = "#1e293b";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY + this.radius * 0.8, 8, Math.PI, 0);
+        ctx.fill();
+        ctx.fillRect(screenX - 8, screenY + this.radius * 0.8, 16, 8);
+      }
 
     } else if (this.buildingType === "archerTower") {
       // --- 3. 아처 타워 그리기 ---
-      // 메인 돌기둥
-      ctx.fillStyle = "#475569";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 성벽 성곽 무늬 (크렌넬)
-      ctx.strokeStyle = "#334155";
-      ctx.lineWidth = 4;
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius * 0.85, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 타워 꼭대기 목재 발판
-      ctx.fillStyle = "#a16207";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius * 0.7, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 4명의 작은 보초 궁수 렌더링 (동서남북 배치)
-      ctx.fillStyle = "#15803d"; // 궁수 녹색 복장
-      const archerOffsets = [{x: 0, y: -0.55}, {x: 0.55, y: 0}, {x: 0, y: 0.55}, {x: -0.55, y: 0}];
-      archerOffsets.forEach(pos => {
+      if (lv === 1) {
+        ctx.fillStyle = "#475569";
         ctx.beginPath();
-        ctx.arc(screenX + this.radius * pos.x, screenY + this.radius * pos.y, 4.5, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = this.teamColor.main; // 머리는 소속 팀 컬러
+        ctx.strokeStyle = "#334155";
+        ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(screenX + this.radius * pos.x, screenY + this.radius * pos.y, 2.5, 0, Math.PI * 2);
+        ctx.arc(screenX, screenY, this.radius * 0.85, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#a16207";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.7, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#15803d"; // 색상 복구
-      });
+      } else if (lv === 2) {
+        // 2단계 강철 타워
+        ctx.fillStyle = "#1e293b";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fbbf24"; // 황금 띠
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.88, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#78350f";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.68, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // 3단계 수정 요새 타워
+        ctx.fillStyle = "#0f172a";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 빛나는 수정 코어
+        ctx.save();
+        ctx.shadowColor = "#38bdf8";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#06b6d4";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 초대형 발리스타 대궁 렌더링
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        let rot = Date.now() * 0.001; 
+        if (this.target && !this.target.isDead) {
+          rot = Math.atan2(this.target.y - this.y, this.target.x - this.x);
+        }
+        ctx.rotate(rot);
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(6, 0, 14, -Math.PI * 0.4, Math.PI * 0.4);
+        ctx.stroke();
+        ctx.fillStyle = "#ca8a04";
+        ctx.fillRect(-8, -2.5, 18, 5);
+        ctx.restore();
+      }
+
+      // 보초 궁수 렌더링
+      if (lv < 3) {
+        ctx.fillStyle = "#15803d";
+        const archerOffsets = [{x: 0, y: -0.55}, {x: 0.55, y: 0}, {x: 0, y: 0.55}, {x: -0.55, y: 0}];
+        archerOffsets.forEach(pos => {
+          ctx.beginPath();
+          ctx.arc(screenX + this.radius * pos.x, screenY + this.radius * pos.y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = this.teamColor.main;
+          ctx.beginPath();
+          ctx.arc(screenX + this.radius * pos.x, screenY + this.radius * pos.y, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#15803d";
+        });
+      }
 
     } else if (this.buildingType === "mageTower") {
       // --- 4. 메이지 타워 그리기 ---
-      // 신비로운 블루/퍼플 원형 기단
-      ctx.fillStyle = "#1e1b4b";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
-      ctx.fill();
+      if (lv === 1) {
+        ctx.fillStyle = "#1e1b4b";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.85, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#312e81";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+        const pulse = 1 + Math.sin(Date.now() * 0.008) * 0.15;
+        ctx.save();
+        ctx.shadowColor = "#a855f7";
+        ctx.shadowBlur = 12;
+        ctx.fillStyle = "#c084fc";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 9 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else if (lv === 2) {
+        // 2단계 공중부양 마법진 제단
+        ctx.fillStyle = "#1e1b4b";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
 
-      // 금빛 기단 장식
-      ctx.strokeStyle = "#fbbf24";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius * 0.85, 0, Math.PI * 2);
-      ctx.stroke();
+        // 3중 회전 마법 고리
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(Date.now() * 0.0015);
+        ctx.strokeStyle = "#c084fc";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.rotate(-Date.now() * 0.003);
+        ctx.strokeStyle = "#06b6d4";
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
 
-      // 내부 제단
-      ctx.fillStyle = "#312e81";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, this.radius * 0.6, 0, Math.PI * 2);
-      ctx.fill();
+        const pulse = 1 + Math.sin(Date.now() * 0.012) * 0.2;
+        ctx.save();
+        ctx.shadowColor = "#a855f7";
+        ctx.shadowBlur = 18;
+        ctx.fillStyle = "#d8b4fe";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 12 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        // 3단계 대마법사 우주 기단 첨탑
+        ctx.fillStyle = "#030712";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#818cf8";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, this.radius * 0.9, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // 중심부에서 발광하는 마법구 (Mage Orb)
-      const pulse = 1 + Math.sin(Date.now() * 0.008) * 0.15;
-      ctx.save();
-      ctx.shadowColor = "#a855f7";
-      ctx.shadowBlur = 12;
-      ctx.fillStyle = "#c084fc";
-      ctx.beginPath();
-      ctx.arc(screenX, screenY, 9 * pulse, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+        // 외부 공전 크리스탈 파편 3개
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(Date.now() * 0.002);
+        ctx.fillStyle = "#a855f7";
+        for (let i = 0; i < 3; i++) {
+          ctx.rotate((Math.PI * 2) / 3);
+          ctx.beginPath();
+          ctx.moveTo(this.radius * 0.8, -4);
+          ctx.lineTo(this.radius * 0.8 + 6, 0);
+          ctx.lineTo(this.radius * 0.8, 4);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+
+        // 폭발하는 우주 에너지 성핵
+        const pulse = 1 + Math.sin(Date.now() * 0.02) * 0.25;
+        ctx.save();
+        ctx.shadowColor = "#ec4899";
+        ctx.shadowBlur = 25;
+        ctx.fillStyle = "#f472b6";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 14 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, 7 * pulse, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        if (Math.random() > 0.9) {
+          particles.push(new Particle(this.x, this.y, "#a855f7", Math.random() * 2 + 1, Math.random() * Math.PI * 2, 20));
+        }
+      }
+
     } else if (this.buildingType === "barracks") {
-      // --- 5. 병영 그리기 (군사 훈련소) ---
-      ctx.fillStyle = "#854d0e";
-      ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.7, this.radius * 2, this.radius * 1.4);
-      
-      ctx.fillStyle = "#1e293b";
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY - this.radius * 1.3);
-      ctx.lineTo(screenX + this.radius + 4, screenY - this.radius * 0.3);
-      ctx.lineTo(screenX - this.radius - 4, screenY - this.radius * 0.3);
-      ctx.closePath();
-      ctx.fill();
+      // --- 5. 병영 그리기 ---
+      if (lv === 1) {
+        ctx.fillStyle = "#854d0e";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.7, this.radius * 2, this.radius * 1.4);
+        ctx.fillStyle = "#1e293b";
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.3);
+        ctx.lineTo(screenX + this.radius + 4, screenY - this.radius * 0.3);
+        ctx.lineTo(screenX - this.radius - 4, screenY - this.radius * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#451a03";
+        ctx.fillRect(screenX - 5, screenY + this.radius * 0.2, 10, this.radius * 0.5);
+        ctx.strokeStyle = this.teamColor.main;
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(screenX - 7, screenY - this.radius * 0.6);
+        ctx.lineTo(screenX + 7, screenY - this.radius * 0.2);
+        ctx.moveTo(screenX + 7, screenY - this.radius * 0.6);
+        ctx.lineTo(screenX - 7, screenY - this.radius * 0.2);
+        ctx.stroke();
+      } else if (lv === 2) {
+        // 2단계 벽돌 요새 훈련소
+        ctx.fillStyle = "#451a03";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.8, this.radius * 2, this.radius * 1.6);
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(screenX - this.radius - 2, screenY - this.radius * 1.1, this.radius * 2 + 4, 10);
 
-      ctx.fillStyle = "#451a03";
-      ctx.fillRect(screenX - 5, screenY + this.radius * 0.2, 10, this.radius * 0.5);
-      
-      ctx.strokeStyle = this.teamColor.main;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(screenX - 7, screenY - this.radius * 0.6);
-      ctx.lineTo(screenX + 7, screenY - this.radius * 0.2);
-      ctx.moveTo(screenX + 7, screenY - this.radius * 0.6);
-      ctx.lineTo(screenX - 7, screenY - this.radius * 0.2);
-      ctx.stroke();
+        // 방패 데코
+        ctx.fillStyle = this.teamColor.main;
+        ctx.beginPath();
+        ctx.arc(screenX - this.radius * 0.5, screenY - this.radius * 0.2, 5, 0, Math.PI * 2);
+        ctx.arc(screenX + this.radius * 0.5, screenY - this.radius * 0.2, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(screenX - 7, screenY + this.radius * 0.3, 14, this.radius * 0.5);
+      } else {
+        // 3단계 성채 사관학교
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+        
+        // 돌 성곽 탑 2개
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(screenX - this.radius - 2, screenY - this.radius * 1.3, 10, this.radius * 0.6);
+        ctx.fillRect(screenX + this.radius - 8, screenY - this.radius * 1.3, 10, this.radius * 0.6);
+
+        // 타오르는 전쟁 깃발
+        ctx.fillStyle = this.teamColor.main;
+        ctx.fillRect(screenX - 3, screenY - this.radius * 0.5, 6, 20);
+        ctx.fillStyle = this.teamColor.accent;
+        ctx.beginPath();
+        ctx.moveTo(screenX + 3, screenY - this.radius * 0.5);
+        ctx.lineTo(screenX + 15, screenY - this.radius * 0.3);
+        ctx.lineTo(screenX + 3, screenY - this.radius * 0.1);
+        ctx.closePath();
+        ctx.fill();
+
+        // 강철 성문
+        ctx.fillStyle = "#ca8a04";
+        ctx.fillRect(screenX - 10, screenY + this.radius * 0.4, 20, this.radius * 0.6);
+      }
 
     } else if (this.buildingType === "stable") {
-      // --- 6. 마구간 그리기 (외양간) ---
-      ctx.fillStyle = "#78350f";
-      ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.9, this.radius * 2, this.radius * 1.6);
+      // --- 6. 마구간 그리기 ---
+      if (lv === 1) {
+        ctx.fillStyle = "#78350f";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.9, this.radius * 2, this.radius * 1.6);
+        ctx.fillStyle = this.teamColor.main;
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.4);
+        ctx.lineTo(screenX + this.radius + 2, screenY - this.radius * 0.7);
+        ctx.lineTo(screenX - this.radius - 2, screenY - this.radius * 0.7);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = "#94a3b8";
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        for (let offset = -this.radius * 0.6; offset <= this.radius * 0.6; offset += 8) {
+          ctx.moveTo(screenX + offset, screenY - this.radius * 0.2);
+          ctx.lineTo(screenX + offset, screenY + this.radius * 0.6);
+        }
+        ctx.stroke();
+      } else if (lv === 2) {
+        // 2단계 철제 마구간
+        ctx.fillStyle = "#451a03";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius * 0.9, this.radius * 2, this.radius * 1.7);
+        ctx.fillStyle = "#475569";
+        ctx.fillRect(screenX - this.radius - 3, screenY - this.radius * 1.1, this.radius * 2 + 6, 8);
 
-      ctx.fillStyle = this.teamColor.main;
-      ctx.beginPath();
-      ctx.moveTo(screenX, screenY - this.radius * 1.4);
-      ctx.lineTo(screenX + this.radius + 2, screenY - this.radius * 0.7);
-      ctx.lineTo(screenX - this.radius - 2, screenY - this.radius * 0.7);
-      ctx.closePath();
-      ctx.fill();
+        // 철창 울타리
+        ctx.strokeStyle = "#cbd5e1";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        for (let offset = -this.radius * 0.7; offset <= this.radius * 0.7; offset += 10) {
+          ctx.moveTo(screenX + offset, screenY - this.radius * 0.2);
+          ctx.lineTo(screenX + offset, screenY + this.radius * 0.7);
+        }
+        ctx.stroke();
+      } else {
+        // 3단계 천상 페가수스 사원
+        ctx.fillStyle = "#f1f5f9";
+        ctx.beginPath();
+        ctx.arc(screenX, screenY + 4, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.fillStyle = "#cbd5e1";
+        ctx.fillRect(screenX - this.radius * 0.7, screenY - this.radius * 0.8, 5, this.radius * 1.5);
+        ctx.fillRect(screenX - this.radius * 0.3, screenY - this.radius * 0.9, 5, this.radius * 1.5);
+        ctx.fillRect(screenX + this.radius * 0.2, screenY - this.radius * 0.9, 5, this.radius * 1.5);
+        ctx.fillRect(screenX + this.radius * 0.6, screenY - this.radius * 0.8, 5, this.radius * 1.5);
 
-      ctx.strokeStyle = "#94a3b8";
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      for (let offset = -this.radius * 0.6; offset <= this.radius * 0.6; offset += 8) {
-        ctx.moveTo(screenX + offset, screenY - this.radius * 0.2);
-        ctx.lineTo(screenX + offset, screenY + this.radius * 0.6);
+        ctx.fillStyle = this.teamColor.main;
+        ctx.beginPath();
+        ctx.moveTo(screenX, screenY - this.radius * 1.5);
+        ctx.lineTo(screenX + this.radius + 4, screenY - this.radius * 0.8);
+        ctx.lineTo(screenX - this.radius - 4, screenY - this.radius * 0.8);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = "#38bdf8";
+        ctx.beginPath();
+        ctx.ellipse(screenX - this.radius * 0.8, screenY - this.radius * 0.3, 8, 4, 0.5, 0, Math.PI * 2);
+        ctx.ellipse(screenX + this.radius * 0.8, screenY - this.radius * 0.3, 8, 4, -0.5, 0, Math.PI * 2);
+        ctx.fill();
       }
-      ctx.stroke();
 
     } else if (this.buildingType === "siegeWorkshop") {
-      // --- 7. 공성소 그리기 (공장 수레) ---
-      ctx.fillStyle = "#334155";
-      ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+      // --- 7. 공성소 그리기 ---
+      if (lv === 1) {
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(screenX - this.radius * 0.7, screenY - this.radius * 1.4, 8, this.radius * 0.7);
+        ctx.fillRect(screenX + this.radius * 0.3, screenY - this.radius * 1.4, 8, this.radius * 0.7);
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(Date.now() * 0.0015);
+        ctx.strokeStyle = "#f1f5f9";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = "#cbd5e1";
+        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
+          ctx.fillRect(Math.cos(a) * this.radius * 0.4 - 3, Math.sin(a) * this.radius * 0.4 - 3, 6, 6);
+        }
+        ctx.restore();
+      } else if (lv === 2) {
+        ctx.fillStyle = "#1e293b";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+        ctx.strokeStyle = "#64748b";
+        ctx.lineWidth = 3;
+        ctx.strokeRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
 
-      ctx.fillStyle = "#1e293b";
-      ctx.fillRect(screenX - this.radius * 0.7, screenY - this.radius * 1.4, 8, this.radius * 0.7);
-      ctx.fillRect(screenX + this.radius * 0.3, screenY - this.radius * 1.4, 8, this.radius * 0.7);
+        ctx.fillStyle = "#475569";
+        ctx.fillRect(screenX - 5, screenY - this.radius * 1.5, 10, this.radius * 0.6);
+        if (Math.random() > 0.85) {
+          particles.push(new Particle(this.x, this.y - this.radius * 1.5, "#94a3b8", Math.random() * 0.5 + 0.2, -Math.PI / 2 + (Math.random() - 0.5) * 0.3, 25));
+        }
 
-      ctx.save();
-      ctx.translate(screenX, screenY);
-      ctx.rotate(Date.now() * 0.0015);
-      ctx.strokeStyle = "#f1f5f9";
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 0.45, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      ctx.fillStyle = "#cbd5e1";
-      for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-        ctx.fillRect(Math.cos(a) * this.radius * 0.4 - 3, Math.sin(a) * this.radius * 0.4 - 3, 6, 6);
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        ctx.rotate(Date.now() * 0.002);
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius * 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = "#0f172a";
+        ctx.fillRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+        ctx.strokeStyle = this.teamColor.main;
+        ctx.lineWidth = 4;
+        ctx.strokeRect(screenX - this.radius, screenY - this.radius, this.radius * 2, this.radius * 2);
+
+        ctx.fillStyle = "#334155";
+        ctx.fillRect(screenX - 12, screenY - this.radius * 1.6, 7, this.radius * 0.7);
+        ctx.fillRect(screenX + 5, screenY - this.radius * 1.6, 7, this.radius * 0.7);
+
+        if (Math.random() > 0.8) {
+          particles.push(new Particle(this.x - 8, this.y - this.radius * 1.6, "#64748b", Math.random() * 0.6 + 0.3, -Math.PI / 2 + (Math.random() - 0.5) * 0.2, 28));
+          particles.push(new Particle(this.x + 8, this.y - this.radius * 1.6, "#64748b", Math.random() * 0.6 + 0.3, -Math.PI / 2 + (Math.random() - 0.5) * 0.2, 28));
+        }
+
+        ctx.save();
+        ctx.translate(screenX, screenY);
+        
+        ctx.save();
+        ctx.translate(-7, 2);
+        ctx.rotate(Date.now() * 0.0035);
+        ctx.strokeStyle = "#b45309";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(7, -2);
+        ctx.rotate(-Date.now() * 0.0035);
+        ctx.strokeStyle = "#d97706";
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.restore();
+
+        if (Math.random() > 0.94) {
+          particles.push(new Particle(this.x + (Math.random() - 0.5) * 20, this.y + (Math.random() - 0.5) * 20, "#fbbf24", Math.random() * 3 + 1, Math.random() * Math.PI * 2, 8));
+        }
       }
-      ctx.restore();
     }
 
     ctx.restore();
@@ -3082,6 +3569,28 @@ async function initSocket() {
     buildings.push(b);
   });
 
+  // H-2. 원격 플레이어 건물 업그레이드 동기화
+  socket.on('buildingUpgraded', (data) => {
+    if (currentGameState !== GAME_STATE.PLAYING) return;
+    const b = buildings.find(x => x.id === data.id);
+    if (b) {
+      b.level = data.level;
+      b.updateSpecsByLevel();
+      b.health = data.health;
+      
+      // 이펙트 렌더링
+      const color = b.owner === player ? "#38bdf8" : b.teamColor.main;
+      for (let i = 0; i < 15; i++) {
+        particles.push(new Particle(b.x, b.y, color, Math.random() * 3 + 1, Math.random() * Math.PI * 2, 25));
+      }
+      floatingTexts.push(new FloatingText(b.x, b.y - b.radius, `레벨 ${b.level} 업그레이드!`, "#fbbf24", true));
+      
+      if (selectedBuilding === b) {
+        showBuildingUpgradeUI(b);
+      }
+    }
+  });
+
   // I. 건물 데미지 및 파괴 연동 수신
   socket.on('buildingDamaged', (data) => {
     const b = buildings.find(x => x.id === data.id);
@@ -3224,6 +3733,168 @@ function updateWaitingRoomList(roomPlayers) {
   listEl.innerHTML = playersHtml;
   document.getElementById("waitingPlayerCount").innerText = Object.keys(roomPlayers).length;
 }
+
+// --- 건물 업그레이드 UI 및 제어 함수 ---
+function getBuildingEffectText(type, lv) {
+  if (type === "mine") {
+    if (lv === 1) return "1초당 +3G 자동 채굴";
+    if (lv === 2) return "1초당 +8G 자동 채굴";
+    return "1초당 +18G 자동 채굴";
+  } else if (type === "house") {
+    if (lv === 1) return "인구수 한도 +15";
+    if (lv === 2) return "인구수 한도 +35";
+    return "인구수 한도 +65";
+  } else if (type === "barracks") {
+    if (lv === 1) return "보병/궁수 6.0초마다 생산";
+    if (lv === 2) return "보병/궁수 4.5초마다 생산 (25% 단축)";
+    return "보병/궁수 3.0초마다 생산 (50% 단축)";
+  } else if (type === "stable") {
+    if (lv === 1) return "경기병/기사 8.0초마다 생산";
+    if (lv === 2) return "경기병/기사 6.0초마다 생산 (25% 단축)";
+    return "경기병/기사 4.0초마다 생산 (50% 단축)";
+  } else if (type === "siegeWorkshop") {
+    if (lv === 1) return "투석기 12.0초마다 생산";
+    if (lv === 2) return "투석기 9.0초마다 생산 (25% 단축)";
+    return "투석기 6.0초마다 생산 (50% 단축)";
+  } else if (type === "archerTower") {
+    if (lv === 1) return "데미지: 22, 사거리: 220, 쿨타임: 1.0초";
+    if (lv === 2) return "데미지: 45, 사거리: 280, 쿨타임: 0.8초";
+    return "데미지: 80, 사거리: 350, 쿨타임: 0.6초";
+  } else if (type === "mageTower") {
+    if (lv === 1) return "데미지: 40(광역), 사거리: 180, 쿨타임: 1.8초";
+    if (lv === 2) return "데미지: 85(광역), 사거리: 240, 쿨타임: 1.4초";
+    return "데미지: 160(광역), 사거리: 300, 쿨타임: 1.0초";
+  }
+  return "";
+}
+
+function showBuildingUpgradeUI(b) {
+  const ui = document.getElementById("buildingUpgradeUI");
+  if (!ui) return;
+  
+  if (!b || b.isDead) {
+    ui.classList.add("hidden");
+    return;
+  }
+  
+  ui.classList.remove("hidden");
+  
+  const icons = {
+    mine: "⛏️",
+    house: "🏠",
+    archerTower: "🏹",
+    mageTower: "🔮",
+    barracks: "⚔️",
+    stable: "🐴",
+    siegeWorkshop: "⚙️"
+  };
+  
+  const names = {
+    mine: "금광",
+    house: "집",
+    archerTower: "아처 타워",
+    mageTower: "메이지 타워",
+    barracks: "병영",
+    stable: "마구간",
+    siegeWorkshop: "공성소"
+  };
+  
+  const lv = b.level || 1;
+  const type = b.buildingType;
+  
+  document.getElementById("upgradeBuildingIcon").innerText = icons[type] || "🏰";
+  document.getElementById("upgradeBuildingName").innerText = `${names[type] || type} (Lv. ${lv})`;
+  document.getElementById("upgradeBuildingHealth").innerText = `HP: ${b.health} / ${b.maxHealth}`;
+  
+  const currentEffect = getBuildingEffectText(type, lv);
+  document.getElementById("upgradeBuildingEffect").innerHTML = `현재 효과: ${currentEffect}`;
+  
+  const upgradeBtn = document.getElementById("upgradeBtn");
+  
+  if (lv >= 3) {
+    document.getElementById("upgradeNextEffect").innerHTML = `<span style="color: #f59e0b;">최대 레벨 도달</span>`;
+    upgradeBtn.style.display = "none";
+  } else {
+    const nextEffect = getBuildingEffectText(type, lv + 1);
+    document.getElementById("upgradeNextEffect").innerHTML = `다음 효과: ${nextEffect}`;
+    upgradeBtn.style.display = "block";
+    
+    const baseCost = BUILDING_SPECS[type].cost;
+    const upgradeCost = baseCost * (lv === 1 ? 4 : 8);
+    document.getElementById("upgradeCostValue").innerText = upgradeCost;
+    
+    if (player.gold < upgradeCost) {
+      upgradeBtn.disabled = true;
+      upgradeBtn.classList.add("disabled");
+    } else {
+      upgradeBtn.disabled = false;
+      upgradeBtn.classList.remove("disabled");
+    }
+  }
+}
+
+function hideBuildingUpgradeUI() {
+  const ui = document.getElementById("buildingUpgradeUI");
+  if (ui) ui.classList.add("hidden");
+}
+
+function executeBuildingUpgrade(b) {
+  if (!b || b.isDead) return;
+  
+  const oldMaxHp = b.maxHealth;
+  b.level = (b.level || 1) + 1;
+  b.updateSpecsByLevel();
+  
+  const hpIncrease = b.maxHealth - oldMaxHp;
+  b.health = Math.min(b.maxHealth, b.health + hpIncrease + Math.round(b.maxHealth * 0.2));
+  
+  if (b.owner === player) {
+    playSound("heal");
+  }
+  
+  const effectColor = b.owner === player ? "#38bdf8" : b.teamColor.main;
+  for (let i = 0; i < 20; i++) {
+    particles.push(new Particle(b.x, b.y, effectColor, Math.random() * 3.5 + 1.5, Math.random() * Math.PI * 2, 30));
+  }
+  
+  floatingTexts.push(new FloatingText(b.x, b.y - b.radius, `레벨 ${b.level} 업그레이드!`, "#fbbf24", true));
+}
+
+function requestUpgradeSelectedBuilding() {
+  if (!selectedBuilding || selectedBuilding.isDead) return;
+  if (selectedBuilding.owner !== player) return;
+  if (selectedBuilding.level >= 3) return;
+  
+  const lv = selectedBuilding.level;
+  const baseCost = BUILDING_SPECS[selectedBuilding.buildingType].cost;
+  const upgradeCost = baseCost * (lv === 1 ? 4 : 8);
+  
+  if (player.gold < upgradeCost) {
+    floatingTexts.push(new FloatingText(player.x, player.y - player.radius, "골드가 부족합니다!", "#ef4444", true));
+    return;
+  }
+  
+  player.gold -= upgradeCost;
+  
+  executeBuildingUpgrade(selectedBuilding);
+  
+  if (isMultiplayer) {
+    socket.emit("upgradeBuilding", {
+      id: selectedBuilding.id,
+      level: selectedBuilding.level,
+      health: selectedBuilding.health
+    });
+  }
+  
+  showBuildingUpgradeUI(selectedBuilding);
+}
+
+// 글로벌 등록
+window.getBuildingEffectText = getBuildingEffectText;
+window.showBuildingUpgradeUI = showBuildingUpgradeUI;
+window.hideBuildingUpgradeUI = hideBuildingUpgradeUI;
+window.executeBuildingUpgrade = executeBuildingUpgrade;
+window.requestUpgradeSelectedBuilding = requestUpgradeSelectedBuilding;
 
 resizeCanvas();
 gameLoop();
