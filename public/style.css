@@ -988,4 +988,60 @@ body, html {
   .key-desc { font-size: 0.78rem; }
 }
 
+/* ===================================================
+   모바일 핸드폰(스마트폰) 환경 전용 축소 스타일
+   =================================================== */
+body.mobile-phone .player-stats {
+  transform: scale(0.68);
+  transform-origin: top left;
+  left: 0.75rem;
+  top: 0.75rem;
+}
+
+body.mobile-phone .leaderboard {
+  transform: scale(0.68);
+  transform-origin: top right;
+  right: 0.75rem;
+  top: 0.75rem;
+}
+
+body.mobile-phone .shop-bar {
+  transform: translateX(-50%) scale(0.65);
+  transform-origin: bottom center;
+  bottom: 0.75rem;
+  width: 95vw;
+  max-width: 95vw;
+}
+
+body.mobile-phone .control-guide {
+  font-size: 0.55rem;
+  bottom: 0.15rem;
+  width: 100%;
+}
+
+body.mobile-phone .lobby-start-card,
+body.mobile-phone .lobby-waiting-card,
+body.mobile-phone #gameOverScreen .menu-box,
+body.mobile-phone #landingScreen .menu-box {
+  transform: translate(-50%, -50%) scale(0.72);
+  transform-origin: center center;
+}
+
+body.mobile-phone .lobby-start-card {
+  left: 50%;
+  top: 50%;
+}
+
+body.mobile-phone .lobby-waiting-card {
+  left: 50%;
+  top: 50%;
+}
+
+body.mobile-phone .guide-modal-box {
+  transform: scale(0.75);
+  transform-origin: center center;
+  max-height: 98vh;
+  padding: 1.2rem 1.5rem 1.2rem;
+}
+
 
