@@ -341,10 +341,37 @@ body, html {
 
 /* 시작 화면 (랜딩 화면) 배경 이미지 설정 */
 #landingScreen {
-  background: linear-gradient(rgba(8, 12, 22, 0.55), rgba(8, 12, 22, 0.7)), url('img/io.png') no-repeat center center;
+  background: linear-gradient(rgba(8, 12, 22, 0.25), rgba(8, 12, 22, 0.35)), url('img/io.png') no-repeat center center;
   background-size: cover;
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* 첫 화면 선명하고 작은 시작 버튼 */
+.landing-start-btn {
+  padding: 0.8rem 2.2rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: none;
+  background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue));
+  color: #ffffff;
+  box-shadow: 0 5px 20px rgba(124, 58, 237, 0.4);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.landing-start-btn:hover {
+  transform: translate(-50%, -50%) scale(1.06);
+  box-shadow: 0 8px 25px rgba(124, 58, 237, 0.65);
+}
+
+.landing-start-btn:active {
+  transform: translate(-50%, -50%) scale(0.96);
 }
 
 /* 범용 숨김 클래스 */
@@ -353,9 +380,11 @@ body, html {
 }
 
 .menu-box {
-  background: var(--hud-bg);
-  border: 1px solid var(--hud-border);
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   border-radius: 24px;
   width: 380px;
   padding: 2.5rem;
@@ -505,10 +534,12 @@ body, html {
 
 /* 대시보드 로비 상태의 전체 배경화면 */
 .hud-container.lobby-bg {
-  background: linear-gradient(rgba(8, 12, 22, 0.5), rgba(8, 12, 22, 0.75)), url('img/1.png') no-repeat center center !important;
+  background: linear-gradient(rgba(8, 12, 22, 0.25), rgba(8, 12, 22, 0.35)), url('img/io.png') no-repeat center center !important;
   background-size: cover !important;
   transition: background 0.4s ease-in-out;
   pointer-events: auto;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* 실시간 미니맵 스타일 */
